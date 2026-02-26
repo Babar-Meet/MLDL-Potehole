@@ -6,12 +6,18 @@ potholes using a trained YOLOv8 model.
 """
 
 import os
+import webbrowser
+from threading import Timer
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from ultralytics import YOLO
 
 # Configuration
 app = Flask(__name__)
+
+def open_browser():
+    webbrowser.open("http://127.0.0.1:8001")
+
 app.secret_key = 'pothole_detection_secret_key'
 
 # Get the project base directory
@@ -240,14 +246,6 @@ def internal_server_error(error):
     return redirect(url_for('index'))
 
 
-if __name__ == '__main__':
-    """
-    Run the Flask application.
-    """
-    print(f"Upload folder: {UPLOAD_FOLDER}")
-    print(f"Results folder: {RESULTS_FOLDER}")
-    print(f"Model path: {MODEL_PATH}")
-    print("\nStarting Flask server...")
-    print("Go to http://127.0.0.1:5000 to use the application")
-    
-    app.run(debug=True, host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    Timer(1, open_browser).start()
+    app.run(host="0.0.0.0", port=8001, debug=True)

@@ -3,144 +3,258 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pothole Detection - YOLOv8</title>
+    <title>Pothole Detector - YOLOv8</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🚧 Pothole Detection System</h1>
-            <p class="subtitle">Using YOLOv8 Deep Learning Model</p>
+    <div class="page">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="container header-inner">
+                <div class="brand">
+                    <div class="brand-icon">⚡</div>
+                    <span class="brand-text">Pothole Detector</span>
+                    <span class="brand-tag">YOLOv8</span>
+                </div>
+                <div class="status-badge">Ready</div>
+            </div>
         </header>
 
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">
-                            {{ message }}
+        <!-- Main -->
+        <main class="main">
+            <div class="container">
+
+                <!-- Hero -->
+                <div class="hero">
+                    <h1 class="hero-title">AI Pothole Detection</h1>
+                    <p class="hero-subtitle">Upload a road image — our model detects potholes with high accuracy</p>
+                </div>
+
+                <!-- Steps -->
+                <nav class="steps">
+                    <div class="step">
+                        <span class="step-circle {% if original_image or result_image %}done{% endif %}">
+                            {% if original_image or result_image %}✓{% else %}1{% endif %}
+                        </span>
+                        <span class="step-text {% if original_image or result_image %}done{% endif %}">Upload</span>
+                    </div>
+                    <div class="step-divider {% if result_image %}done{% endif %}"></div>
+                    <div class="step">
+                        <span class="step-circle {% if result_image %}done{% elif original_image %}active{% endif %}">
+                            {% if result_image %}✓{% else %}2{% endif %}
+                        </span>
+                        <span class="step-text {% if result_image %}done{% elif original_image %}active{% endif %}">Process</span>
+                    </div>
+                    <div class="step-divider {% if result_image %}done{% endif %}"></div>
+                    <div class="step">
+                        <span class="step-circle {% if result_image %}active{% endif %}">3</span>
+                        <span class="step-text {% if result_image %}active{% endif %}">Results</span>
+                    </div>
+                </nav>
+
+                <!-- Upload Card -->
+                <div class="card upload-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Upload Road Image</h2>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="upload-form">
+                            <label for="file" class="upload-zone" id="upload-zone" tabindex="0">
+                                <input type="file" name="file" id="file" class="upload-input" accept="image/*" required>
+
+                                <div class="upload-content">
+                                    <div class="upload-icon">☁️</div>
+                                    <div class="upload-main-text">Drag & Drop or Click to Upload</div>
+                                    <div class="upload-hint">Best results with clear road/street photos</div>
+                                    <div class="upload-formats">JPG, PNG, GIF, BMP, WebP  •  max 16 MB</div>
+
+                                    <div class="file-selected" id="file-selected">
+                                        <span class="file-icon">📄</span>
+                                        <span id="file-name" class="file-name-text"></span>
+                                    </div>
+                                </div>
+                            </label>
+
+                            <div class="upload-actions">
+                                <button type="submit" class="btn btn-primary" id="detect-btn" disabled>
+                                    <span>🔍</span> Detect Potholes
+                                </button>
+                                <div id="error-message" class="error-message">Please select an image first</div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Results (only shown after processing) -->
+                {% if result_image %}
+                <section class="results">
+                    <div class="results-stats">
+                        <div class="stat-box">
+                            <div class="stat-label">Potholes Found</div>
+                            <div class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}">
+                                {{ num_detections }}
+                            </div>
                         </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
-        <!-- Upload Section -->
-        <div class="upload-section">
-            <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" class="upload-form">
-                <div class="file-input-wrapper">
-                    <label for="file" class="file-label">
-                        <span class="file-icon">📁</span>
-                        <span class="file-text">Choose an image</span>
-                        <input type="file" name="file" id="file" accept="image/*" required onchange="updateFileName(this)">
-                    </label>
-                </div>
-                <div id="file-name" class="file-name"></div>
-                <button type="submit" class="btn-submit">
-                    <span>🔍</span> Detect Potholes
-                </button>
-            </form>
-        </div>
-
-        <!-- Results Section -->
-        {% if original_image or result_image %}
-            <div class="results-section">
-                <h2>Detection Results</h2>
-                
-                {% if num_detections is defined %}
-                    <div class="detection-summary">
-                        <div class="detection-count">
-                            <span class="count-number">{{ num_detections }}</span>
-                            <span class="count-label">Pothole{{ 's' if num_detections != 1 else '' }} Detected</span>
+                        <div class="stat-box">
+                            <div class="stat-label">Status</div>
+                            <div class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}">
+                                {% if num_detections > 0 %}Detected{% else %}Clear{% endif %}
+                            </div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Filename</div>
+                            <div class="stat-value filename-value">{{ filename }}</div>
                         </div>
                     </div>
+
+                    <div class="results-grid">
+                        <div class="image-panel">
+                            <div class="image-panel-header">Original</div>
+                            <div class="image-panel-body">
+                                <img src="{{ original_image }}" alt="Original Image" id="img-original">
+                            </div>
+                        </div>
+                        <div class="image-panel">
+                            <div class="image-panel-header highlight">Detection Result</div>
+                            <div class="image-panel-body">
+                                <img src="{{ result_image }}" alt="Detection Result" id="img-result">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="results-action">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">Analyze Another Image</a>
+                    </div>
+                </section>
                 {% endif %}
 
-                <div class="image-comparison">
-                    <div class="image-box">
-                        <h3>Original Image</h3>
-                        <div class="image-container">
-                            <img src="{{ original_image }}" alt="Original Image" id="original-img" loading="eager">
-                        </div>
+                <!-- Footer info row -->
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="info-label">Model</div>
+                        <div class="info-value">YOLOv8</div>
                     </div>
-                    <div class="image-box result-box">
-                        <h3>Detected Potholes (Bounding Boxes)</h3>
-                        <div class="image-container">
-                            <img src="{{ result_image }}" alt="Detection Result" id="result-img" loading="eager">
-                        </div>
+                    <div class="info-card">
+                        <div class="info-label">Confidence</div>
+                        <div class="info-value">≥ 25%</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Max Size</div>
+                        <div class="info-value">16 MB</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Formats</div>
+                        <div class="info-value">JPG, PNG, GIF, WebP</div>
                     </div>
                 </div>
 
-                <div class="actions">
-                    <a href="{{ url_for('index') }}" class="btn-new">🔄 Detect Another Image</a>
-                </div>
             </div>
-        {% endif %}
+        </main>
 
-        <!-- Info Section -->
-        <div class="info-section">
-            <h3>About This System</h3>
-            <p>
-                This application uses <strong>YOLOv8</strong> (You Only Look Once version 8), 
-                a state-of-the-art object detection model, to identify potholes in road images.
-                The model has been trained on a dataset of road images with pothole annotations.
-            </p>
-            <div class="specs">
-                <div class="spec-item">
-                    <span class="spec-label">Model:</span>
-                    <span class="spec-value">YOLOv8</span>
-                </div>
-                <div class="spec-item">
-                    <span class="spec-label">Confidence Threshold:</span>
-                    <span class="spec-value">0.25 (25%)</span>
-                </div>
-                <div class="spec-item">
-                    <span class="spec-label">Supported Formats:</span>
-                    <span class="spec-value">JPG, JPEG, PNG, GIF, BMP, WebP</span>
-                </div>
-            </div>
-        </div>
-
-        <footer>
-            <p>&copy; 2024 Pothole Detection System | Powered by Ultralytics YOLOv8</p>
+        <!-- Footer -->
+        <footer class="footer">
+            Pothole Detection System • Powered by YOLOv8
         </footer>
     </div>
 
+    <!-- Modal for full-size image view -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Close">×</button>
+            <img src="" alt="Full size preview" id="modal-img">
+        </div>
+    </div>
+
     <script>
-        function updateFileName(input) {
-            const fileNameDisplay = document.getElementById('file-name');
-            if (input.files && input.files[0]) {
-                fileNameDisplay.textContent = 'Selected: ' + input.files[0].name;
-                fileNameDisplay.classList.add('show');
+        const fileInput   = document.getElementById('file');
+        const uploadZone  = document.getElementById('upload-zone');
+        const fileSelected = document.getElementById('file-selected');
+        const fileNameEl  = document.getElementById('file-name');
+        const detectBtn   = document.getElementById('detect-btn');
+        const errorMsg    = document.getElementById('error-message');
+        const form        = document.getElementById('upload-form');
+
+        function handleFile(file) {
+            if (file) {
+                fileNameEl.textContent = file.name;
+                fileSelected.classList.add('show');
+                uploadZone.classList.add('has-file');
+                detectBtn.disabled = false;
+                errorMsg.classList.remove('show');
             } else {
-                fileNameDisplay.textContent = '';
-                fileNameDisplay.classList.remove('show');
+                fileSelected.classList.remove('show');
+                uploadZone.classList.remove('has-file');
+                detectBtn.disabled = true;
             }
         }
 
-        // Add loading state to form submission
-        document.querySelector('.upload-form').addEventListener('submit', function(e) {
-            // Validate file is selected before submitting
-            const fileInput = document.getElementById('file');
-            if (!fileInput.files || !fileInput.files[0]) {
-                e.preventDefault();
-                alert('Please select an image first.');
-                return false;
-            }
-            
-            const submitBtn = document.querySelector('.btn-submit');
-            submitBtn.innerHTML = '<span class="loading">⏳ Processing...</span>';
-            submitBtn.disabled = true;
-            // Allow form to continue submission
-            return true;
+        fileInput.addEventListener('change', () => {
+            handleFile(fileInput.files[0]);
         });
 
-        // Image zoom on click
-        document.querySelectorAll('.image-container img').forEach(img => {
-            img.addEventListener('click', function() {
-                this.classList.toggle('zoomed');
+        // Drag & drop
+        uploadZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Keyboard accessibility
+        uploadZone.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInput.click();
+            }
+        });
+
+        // Form submit validation + loading
+        form.addEventListener('submit', e => {
+            if (!fileInput.files?.length) {
+                e.preventDefault();
+                errorMsg.classList.add('show');
+                fileInput.focus();
+                return;
+            }
+            detectBtn.classList.add('loading');
+            detectBtn.disabled = true;
+        });
+
+        // Modal zoom
+        document.querySelectorAll('.image-panel-body img').forEach(img => {
+            img.addEventListener('click', () => {
+                document.getElementById('modal-img').src = img.src;
+                document.getElementById('modal').classList.add('active');
             });
+        });
+
+        document.querySelector('.modal-close').addEventListener('click', () => {
+            document.getElementById('modal').classList.remove('active');
+        });
+        document.getElementById('modal').addEventListener('click', e => {
+            if (e.target === document.getElementById('modal')) {
+                document.getElementById('modal').classList.remove('active');
+            }
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                document.getElementById('modal').classList.remove('active');
+            }
         });
     </script>
 </body>
