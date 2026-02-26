@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pothole Detection - YOLOv8</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚧 Pothole Detection System</h1>
+            <p class="subtitle">Using YOLOv8 Deep Learning Model</p>
+        </header>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" class="upload-form">
+                <div class="file-input-wrapper">
+                    <label for="file" class="file-label">
+                        <span class="file-icon">📁</span>
+                        <span class="file-text">Choose an image</span>
+                        <input type="file" name="file" id="file" accept="image/*" required onchange="updateFileName(this)">
+                    </label>
+                </div>
+                <div id="file-name" class="file-name"></div>
+                <button type="submit" class="btn-submit">
+                    <span>🔍</span> Detect Potholes
+                </button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        {% if original_image or result_image %}
+            <div class="results-section">
+                <h2>Detection Results</h2>
+                
+                {% if num_detections is defined %}
+                    <div class="detection-summary">
+                        <div class="detection-count">
+                            <span class="count-number">{{ num_detections }}</span>
+                            <span class="count-label">Pothole{{ 's' if num_detections != 1 else '' }} Detected</span>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="image-comparison">
+                    <div class="image-box">
+                        <h3>Original Image</h3>
+                        <div class="image-container">
+                            <img src="{{ original_image }}" alt="Original Image" id="original-img" loading="eager">
+                        </div>
+                    </div>
+                    <div class="image-box result-box">
+                        <h3>Detected Potholes (Bounding Boxes)</h3>
+                        <div class="image-container">
+                            <img src="{{ result_image }}" alt="Detection Result" id="result-img" loading="eager">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <a href="{{ url_for('index') }}" class="btn-new">🔄 Detect Another Image</a>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Info Section -->
+        <div class="info-section">
+            <h3>About This System</h3>
+            <p>
+                This application uses <strong>YOLOv8</strong> (You Only Look Once version 8), 
+                a state-of-the-art object detection model, to identify potholes in road images.
+                The model has been trained on a dataset of road images with pothole annotations.
+            </p>
+            <div class="specs">
+                <div class="spec-item">
+                    <span class="spec-label">Model:</span>
+                    <span class="spec-value">YOLOv8</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Confidence Threshold:</span>
+                    <span class="spec-value">0.25 (25%)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Supported Formats:</span>
+                    <span class="spec-value">JPG, JPEG, PNG, GIF, BMP, WebP</span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2024 Pothole Detection System | Powered by Ultralytics YOLOv8</p>
+        </footer>
+    </div>
+
+    <script>
+        function updateFileName(input) {
+            const fileNameDisplay = document.getElementById('file-name');
+            if (input.files && input.files[0]) {
+                fileNameDisplay.textContent = 'Selected: ' + input.files[0].name;
+                fileNameDisplay.classList.add('show');
+            } else {
+                fileNameDisplay.textContent = '';
+                fileNameDisplay.classList.remove('show');
+            }
+        }
+
+        // Add loading state to form submission
+        document.querySelector('.upload-form').addEventListener('submit', function(e) {
+            // Validate file is selected before submitting
+            const fileInput = document.getElementById('file');
+            if (!fileInput.files || !fileInput.files[0]) {
+                e.preventDefault();
+                alert('Please select an image first.');
+                return false;
+            }
+            
+            const submitBtn = document.querySelector('.btn-submit');
+            submitBtn.innerHTML = '<span class="loading">⏳ Processing...</span>';
+            submitBtn.disabled = true;
+            // Allow form to continue submission
+            return true;
+        });
+
+        // Image zoom on click
+        document.querySelectorAll('.image-container img').forEach(img => {
+            img.addEventListener('click', function() {
+                this.classList.toggle('zoomed');
+            });
+        });
+    </script>
+</body>
+</html>
