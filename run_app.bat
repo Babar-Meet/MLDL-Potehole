@@ -43,5 +43,3 @@ echo   To stop the server, close this window
 echo   or press Ctrl+C in the Flask server window
 echo =============================================
 echo.
-
-pause

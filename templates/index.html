@@ -31,40 +31,33 @@
                 <!-- Hero -->
                 <div class="hero">
                     <h1 class="hero-title">AI Pothole Detection</h1>
-                    <p class="hero-subtitle">Upload a road image — our model detects potholes with high accuracy</p>
+                    <p class="hero-subtitle">Drop or select a road image — detection starts automatically</p>
                 </div>
 
                 <!-- Steps -->
                 <nav class="steps">
                     <div class="step">
-                        <span class="step-circle {% if original_image or result_image %}done{% endif %}">
-                            {% if original_image or result_image %}✓{% else %}1{% endif %}
+                        <span class="step-circle {% if processing or result_image %}done{% elif processing %}active{% endif %}">
+                            {% if processing or result_image %}✓{% else %}1{% endif %}
                         </span>
-                        <span class="step-text {% if original_image or result_image %}done{% endif %}">Upload</span>
+                        <span class="step-text {% if processing or result_image %}done{% endif %}">Upload</span>
                     </div>
                     <div class="step-divider {% if result_image %}done{% endif %}"></div>
                     <div class="step">
-                        <span class="step-circle {% if result_image %}done{% elif original_image %}active{% endif %}">
-                            {% if result_image %}✓{% else %}2{% endif %}
-                        </span>
-                        <span class="step-text {% if result_image %}done{% elif original_image %}active{% endif %}">Process</span>
-                    </div>
-                    <div class="step-divider {% if result_image %}done{% endif %}"></div>
-                    <div class="step">
-                        <span class="step-circle {% if result_image %}active{% endif %}">3</span>
-                        <span class="step-text {% if result_image %}active{% endif %}">Results</span>
+                        <span class="step-circle {% if result_image %}active{% elif processing %}active{% endif %}">2</span>
+                        <span class="step-text {% if result_image or processing %}active{% endif %}">Results</span>
                     </div>
                 </nav>
 
                 <!-- Upload Card -->
-                <div class="card upload-card">
+                <div id="upload-view" class="card upload-card" style="display: {% if not result_image and not error %}block{% else %}none{% endif %};">
                     <div class="card-header">
                         <h2 class="card-title">Upload Road Image</h2>
                     </div>
                     <div class="card-body">
                         <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="upload-form">
                             <label for="file" class="upload-zone" id="upload-zone" tabindex="0">
-                                <input type="file" name="file" id="file" class="upload-input" accept="image/*" required>
+                                <input type="file" name="file" id="file" class="upload-input" accept="image/*">
 
                                 <div class="upload-content">
                                     <div class="upload-icon">☁️</div>
@@ -79,57 +72,68 @@
                                 </div>
                             </label>
 
-                            <div class="upload-actions">
-                                <button type="submit" class="btn btn-primary" id="detect-btn" disabled>
-                                    <span>🔍</span> Detect Potholes
-                                </button>
-                                <div id="error-message" class="error-message">Please select an image first</div>
+                            <!-- Processing UI -->
+                            <div id="processing" class="processing" style="display: none;">
+                                <div class="spinner"></div>
+                                <span>Analyzing image for potholes...</span>
                             </div>
+
+                            <div id="error-message" class="error-message">Please select an image first</div>
                         </form>
                     </div>
                 </div>
 
-                <!-- Results (only shown after processing) -->
-                {% if result_image %}
-                <section class="results">
-                    <div class="results-stats">
-                        <div class="stat-box">
-                            <div class="stat-label">Potholes Found</div>
-                            <div class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}">
-                                {{ num_detections }}
+                <!-- Results -->
+                <div id="results-view" style="display: {% if result_image %}block{% else %}none{% endif %};">
+                    {% if result_image %}
+                    <section class="results">
+                        <div class="results-stats">
+                            <div class="stat-box">
+                                <div class="stat-label">Potholes Found</div>
+                                <div class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}">
+                                    {{ num_detections }}
+                                </div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">Status</div>
+                                <div class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}">
+                                    {% if num_detections > 0 %}Detected{% else %}Clear{% endif %}
+                                </div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">Filename</div>
+                                <div class="stat-value filename-value">{{ filename }}</div>
                             </div>
                         </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Status</div>
-                            <div class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}">
-                                {% if num_detections > 0 %}Detected{% else %}Clear{% endif %}
-                            </div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Filename</div>
-                            <div class="stat-value filename-value">{{ filename }}</div>
-                        </div>
-                    </div>
 
-                    <div class="results-grid">
-                        <div class="image-panel">
-                            <div class="image-panel-header">Original</div>
-                            <div class="image-panel-body">
-                                <img src="{{ original_image }}" alt="Original Image" id="img-original">
+                        <div class="results-grid">
+                            <div class="image-panel">
+                                <div class="image-panel-header">Original</div>
+                                <div class="image-panel-body">
+                                    <img src="{{ original_image }}" alt="Original Image" id="img-original">
+                                </div>
+                            </div>
+                            <div class="image-panel">
+                                <div class="image-panel-header highlight">Detection Result</div>
+                                <div class="image-panel-body">
+                                    <img src="{{ result_image }}" alt="Detection Result" id="img-result">
+                                </div>
                             </div>
                         </div>
-                        <div class="image-panel">
-                            <div class="image-panel-header highlight">Detection Result</div>
-                            <div class="image-panel-body">
-                                <img src="{{ result_image }}" alt="Detection Result" id="img-result">
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="results-action">
-                        <a href="{{ url_for('index') }}" class="btn btn-secondary">Analyze Another Image</a>
-                    </div>
-                </section>
+                        <div class="results-action">
+                            <a href="/" class="btn btn-secondary">Analyze Another Image</a>
+                        </div>
+                    </section>
+                    {% endif %}
+                </div>
+
+                <!-- Error Display -->
+                {% if error %}
+                <div id="error-display" class="error-display">
+                    <span class="error-icon">⚠️</span>
+                    <span>{{ error }}</span>
+                </div>
                 {% endif %}
 
                 <!-- Footer info row -->
@@ -170,26 +174,92 @@
     </div>
 
     <script>
-        const fileInput   = document.getElementById('file');
-        const uploadZone  = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file');
+        const uploadZone = document.getElementById('upload-zone');
         const fileSelected = document.getElementById('file-selected');
-        const fileNameEl  = document.getElementById('file-name');
-        const detectBtn   = document.getElementById('detect-btn');
-        const errorMsg    = document.getElementById('error-message');
-        const form        = document.getElementById('upload-form');
+        const fileNameEl = document.getElementById('file-name');
+        const errorMsg = document.getElementById('error-message');
+        const form = document.getElementById('upload-form');
+        const uploadView = document.getElementById('upload-view');
+        const resultsView = document.getElementById('results-view');
+        const processing = document.getElementById('processing');
+        const newUploadBtn = document.getElementById('new-upload-btn');
 
         function handleFile(file) {
             if (file) {
                 fileNameEl.textContent = file.name;
                 fileSelected.classList.add('show');
                 uploadZone.classList.add('has-file');
-                detectBtn.disabled = false;
                 errorMsg.classList.remove('show');
+                
+                // Auto-submit the form
+                submitForm();
             } else {
                 fileSelected.classList.remove('show');
                 uploadZone.classList.remove('has-file');
-                detectBtn.disabled = true;
             }
+        }
+
+        function submitForm() {
+            if (!fileInput.files?.length) {
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            const formData = new FormData(form);
+            
+            // Show processing UI
+            uploadZone.style.display = 'none';
+            processing.style.display = 'flex';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Check for errors
+                const errorDisplay = doc.querySelector('#error-display');
+                const resultsSection = doc.querySelector('.results');
+                
+                if (errorDisplay) {
+                    // Show error
+                    const errorText = errorDisplay.textContent;
+                    uploadZone.style.display = 'flex';
+                    processing.style.display = 'none';
+                    errorMsg.textContent = errorText;
+                    errorMsg.classList.add('show');
+                } else if (resultsSection) {
+                    // Show results
+                    const newResults = document.importNode(resultsSection, true);
+                    resultsView.innerHTML = '';
+                    resultsView.appendChild(newResults);
+                    resultsView.style.display = 'block';
+                    uploadView.style.display = 'none';
+                    
+                    // Re-attach modal handlers
+                    attachModalHandlers();
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                uploadZone.style.display = 'flex';
+                processing.style.display = 'none';
+                errorMsg.textContent = 'Error processing image. Please try again.';
+                errorMsg.classList.add('show');
+            });
+        }
+
+        function attachModalHandlers() {
+            document.querySelectorAll('.image-panel-body img').forEach(img => {
+                img.addEventListener('click', () => {
+                    document.getElementById('modal-img').src = img.src;
+                    document.getElementById('modal').classList.add('active');
+                });
+            });
         }
 
         fileInput.addEventListener('change', () => {
@@ -223,31 +293,29 @@
             }
         });
 
-        // Form submit validation + loading
-        form.addEventListener('submit', e => {
-            if (!fileInput.files?.length) {
-                e.preventDefault();
-                errorMsg.classList.add('show');
-                fileInput.focus();
-                return;
-            }
-            detectBtn.classList.add('loading');
-            detectBtn.disabled = true;
+        // New upload button - properly reset and reload
+        newUploadBtn?.addEventListener('click', e => {
+            e.preventDefault();
+            // Reset file input
+            fileInput.value = '';
+            fileSelected.classList.remove('show');
+            uploadZone.classList.remove('has-file');
+            uploadZone.style.display = 'flex';
+            resultsView.innerHTML = '';
+            resultsView.style.display = 'none';
+            uploadView.style.display = 'block';
+            errorMsg.classList.remove('show');
+            
+            // Force page reload to reset everything cleanly
+            window.location.href = '/';
         });
 
-        // Modal zoom
-        document.querySelectorAll('.image-panel-body img').forEach(img => {
-            img.addEventListener('click', () => {
-                document.getElementById('modal-img').src = img.src;
-                document.getElementById('modal').classList.add('active');
-            });
-        });
-
+        // Modal handlers
         document.querySelector('.modal-close').addEventListener('click', () => {
             document.getElementById('modal').classList.remove('active');
         });
         document.getElementById('modal').addEventListener('click', e => {
-            if (e.target === document.getElementById('modal')) {
+            if (e.target.id === 'modal') {
                 document.getElementById('modal').classList.remove('active');
             }
         });
@@ -256,6 +324,9 @@
                 document.getElementById('modal').classList.remove('active');
             }
         });
+
+        // Initial modal attachment
+        attachModalHandlers();
     </script>
 </body>
 </html>

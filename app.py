@@ -6,17 +6,12 @@ potholes using a trained YOLOv8 model.
 """
 
 import os
-import webbrowser
-from threading import Timer
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from ultralytics import YOLO
 
 # Configuration
 app = Flask(__name__)
-
-def open_browser():
-    webbrowser.open("http://127.0.0.1:8001")
 
 app.secret_key = 'pothole_detection_secret_key'
 
@@ -99,29 +94,25 @@ def upload_file():
     Handle file upload, run inference, and display results.
     
     Returns:
-        Redirect to index with results or error message
+        Rendered HTML template with results or error
     """
     # Check if model is loaded
     if model is None:
-        flash('Error: Model not loaded. Please check the model path.', 'error')
-        return redirect(url_for('index'))
+        return render_template('index.html', error='Error: Model not loaded. Please check the model path.')
     
     # Check if file part exists
     if 'file' not in request.files:
-        flash('No file part in the request.', 'error')
-        return redirect(url_for('index'))
+        return render_template('index.html', error='No file selected. Please choose an image.')
     
     file = request.files['file']
     
     # Check if file was selected
     if file.filename == '':
-        flash('No file selected.', 'error')
-        return redirect(url_for('index'))
+        return render_template('index.html', error='No file selected. Please choose an image.')
     
     # Validate file
     if not allowed_file(file.filename):
-        flash('Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp).', 'error')
-        return redirect(url_for('index'))
+        return render_template('index.html', error='Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp).')
     
     try:
         # Secure the filename and create unique name
@@ -145,9 +136,9 @@ def upload_file():
             project=RESULTS_FOLDER,
             name='output',
             exist_ok=True,
-            line_width=LINE_THICKNESS,  # Thicker lines for better visibility
-            show_labels=True,  # Show class labels
-            show_conf=True  # Show confidence scores
+            line_width=LINE_THICKNESS,
+            show_labels=True,
+            show_conf=True
         )
         
         # Get the result image path
@@ -176,8 +167,7 @@ def upload_file():
             if result.boxes is not None:
                 num_detections = len(result.boxes)
         
-        # Prepare URLs for display - use direct file paths
-        # The uploads folder is served from the project root
+        # Prepare URLs for display
         original_url = url_for('uploaded_file', filename=f'uploads/{filename}')
         result_url = url_for('uploaded_file', filename=f'results/output/{result_filename}')
         
@@ -190,8 +180,7 @@ def upload_file():
         )
         
     except Exception as e:
-        flash(f'Error processing image: {str(e)}', 'error')
-        return redirect(url_for('index'))
+        return render_template('index.html', error=f'Error processing image: {str(e)}')
 
 
 @app.route('/uploads/<path:filename>')
@@ -247,5 +236,4 @@ def internal_server_error(error):
 
 
 if __name__ == "__main__":
-    Timer(1, open_browser).start()
-    app.run(host="0.0.0.0", port=8001, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
