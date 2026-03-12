@@ -18,15 +18,19 @@ import time
 # Configuration
 app = Flask(__name__)
 
-app.secret_key = 'pothole_detection_secret_key'
+# Secret key (override in production via SECRET_KEY env var)
+app.secret_key = os.getenv('SECRET_KEY', 'pothole_detection_secret_key')
 
 # Get the project base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Paths
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-RESULTS_FOLDER = os.path.join(BASE_DIR, 'results')
-MODEL_PATH = os.path.join(BASE_DIR, 'pothole_yolo', 'pothole_yolo', 'train1', 'weights', 'best.pt')
+# Paths (can be overridden via env vars for deployment)
+UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
+RESULTS_FOLDER = os.getenv('RESULTS_FOLDER', os.path.join(BASE_DIR, 'results'))
+MODEL_PATH = os.getenv(
+    'MODEL_PATH',
+    os.path.join(BASE_DIR, 'pothole_yolo', 'pothole_yolo', 'train1', 'weights', 'best.pt')
+)
 
 # Allowed extensions
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
@@ -602,4 +606,7 @@ def internal_server_error(error):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Support PORT env var for local container runs
+    port = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_DEBUG", "true").lower() == "true"
+    app.run(host="0.0.0.0", port=port, debug=debug)

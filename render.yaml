@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pothole-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        sync: false
+      - key: MODEL_PATH
+        sync: false
+      - key: UPLOAD_FOLDER
+        sync: false
+      - key: RESULTS_FOLDER
+        sync: false
