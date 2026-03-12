@@ -9,7 +9,8 @@ Supports both batch processing and live real-time video streaming.
 import os
 import cv2
 import numpy as np
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, Response
+from flask import Flask, request, jsonify, send_from_directory, Response
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from ultralytics import YOLO
 import threading
@@ -17,6 +18,7 @@ import time
 
 # Configuration
 app = Flask(__name__)
+CORS(app)
 
 # Secret key (override in production via SECRET_KEY env var)
 app.secret_key = os.getenv('SECRET_KEY', 'pothole_detection_secret_key')
@@ -148,12 +150,22 @@ def draw_detections(frame, results):
 @app.route('/')
 def index():
     """
-    Render the main page with the upload form.
+    Root endpoint to verify API is running.
     
     Returns:
-        Rendered HTML template
+        JSON status message
     """
-    return render_template('index.html', live_mode=False)
+    return jsonify({"status": "healthy", "service": "Pothole Detection API"})
+
+@app.route('/health')
+def health():
+    """
+    Health check endpoint.
+    
+    Returns:
+        JSON status message
+    """
+    return jsonify({"status": "healthy"})
 
 
 @app.route('/upload', methods=['POST'])
@@ -167,17 +179,17 @@ def upload_file():
     """
     # Check if model is loaded
     if model is None:
-        return render_template('index.html', error='Error: Model not loaded. Please check the model path.')
+        return jsonify({'error': 'Error: Model not loaded. Please check the model path.'}), 500
     
     # Check if file part exists
     if 'file' not in request.files:
-        return render_template('index.html', error='No file selected. Please choose a file.')
+        return jsonify({'error': 'No file selected. Please choose a file.'}), 400
     
     file = request.files['file']
     
     # Check if file was selected
     if file.filename == '':
-        return render_template('index.html', error='No file selected. Please choose a file.')
+        return jsonify({'error': 'No file selected. Please choose a file.'}), 400
     
     # Check file type and process accordingly
     if allowed_video_file(file.filename):
@@ -185,19 +197,18 @@ def upload_file():
     elif allowed_image_file(file.filename):
         return process_image(file)
     else:
-        return render_template('index.html', 
-            error='Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp) or video (mp4, avi, mov, mkv).')
+        return jsonify({'error': 'Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp) or video (mp4, avi, mov, mkv).'}), 400
 
 
 @app.route('/live-video')
 def live_video_page():
     """
-    Render the live video streaming page.
+    Redirect to frontend for live video functionality.
     
     Returns:
-        Rendered HTML template
+        JSON status
     """
-    return render_template('index.html', live_mode=True)
+    return jsonify({"error": "This is an API only. Live video UI is handled by frontend."}), 400
 
 
 def process_video_generator(video_path):
@@ -415,28 +426,22 @@ def process_image(file):
                         result_path = os.path.join(output_dir, f)
                         break
         
-        # Count detections
-        num_detections = 0
-        if results and len(results) > 0:
-            result = results[0]
-            if result.boxes is not None:
-                num_detections = len(result.boxes)
         
-        # Prepare URLs for display
-        original_url = url_for('uploaded_file', filename=f'uploads/{filename}')
-        result_url = url_for('uploaded_file', filename=f'results/output/{result_filename}')
+        # Prepare URLs for display (these would be URLs relative to the API host)
+        original_url = f'/uploads/{filename}'
+        result_url = f'/results/output/{result_filename}'
         
-        return render_template(
-            'index.html',
-            original_image=original_url,
-            result_image=result_url,
-            num_detections=num_detections,
-            filename=filename,
-            is_video=False
-        )
+        return jsonify({
+            'status': 'success',
+            'original_image': original_url,
+            'result_image': result_url,
+            'num_detections': num_detections,
+            'filename': filename,
+            'is_video': False
+        })
         
     except Exception as e:
-        return render_template('index.html', error=f'Error processing image: {str(e)}')
+        return jsonify({'error': f'Error processing image: {str(e)}'}), 500
 
 
 def process_video(file):
@@ -468,7 +473,7 @@ def process_video(file):
         cap = cv2.VideoCapture(upload_path)
         
         if not cap.isOpened():
-            return render_template('index.html', error='Error: Could not open video file.')
+            return jsonify({'error': 'Error: Could not open video file.'}), 500
         
         # Get video properties
         fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -536,21 +541,21 @@ def process_video(file):
         out.release()
         
         # Prepare URLs for display
-        original_url = url_for('uploaded_file', filename=f'uploads/{filename}')
-        result_url = url_for('uploaded_file', filename=f'results/output/{output_filename}')
+        original_url = f'/uploads/{filename}'
+        result_url = f'/results/output/{output_filename}'
         
-        return render_template(
-            'index.html',
-            original_video=original_url,
-            result_video=result_url,
-            num_detections=total_detections,
-            filename=filename,
-            is_video=True,
-            video_fps=fps
-        )
+        return jsonify({
+            'status': 'success',
+            'original_video': original_url,
+            'result_video': result_url,
+            'num_detections': total_detections,
+            'filename': filename,
+            'is_video': True,
+            'video_fps': fps
+        })
         
     except Exception as e:
-        return render_template('index.html', error=f'Error processing video: {str(e)}')
+        return jsonify({'error': f'Error processing video: {str(e)}'}), 500
 
 
 @app.route('/uploads/<path:filename>')

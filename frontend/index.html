@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pothole Detector - YOLOv8</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+      rel="stylesheet"
+      href="style.css"
+    />
+    <style>
+      .upload-type-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .upload-type-btn {
+        padding: 12px 24px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .upload-type-btn:hover {
+        border-color: #4a90d9;
+        background: #f8f9fa;
+      }
+
+      .upload-type-btn.active {
+        background: #4a90d9;
+        color: white;
+        border-color: #4a90d9;
+      }
+
+      .upload-type-btn svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .video-results {
+        margin-top: 30px;
+      }
+
+      .video-container {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .video-container video,
+      .video-container img.live-stream {
+        width: 100%;
+        display: block;
+        max-height: 70vh;
+      }
+
+      .video-stats {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+
+      .video-label {
+        display: block;
+        text-align: center;
+        margin-bottom: 10px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .live-mode-badge {
+        display: inline-block;
+        background: #e74c3c;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: 10px;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .live-controls {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 15px;
+        flex-wrap: wrap;
+      }
+
+      .btn-stop {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+      }
+
+      .btn-stop:hover {
+        background: #c0392b;
+      }
+
+      .loading-stream {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+
+      .loading-stream .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #4a90d9;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error-stream {
+        text-align: center;
+        padding: 40px;
+        color: #e74c3c;
+        background: #fadbd8;
+        border-radius: 8px;
+        margin: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- Header -->
+      <header class="header">
+        <div class="container header-inner">
+          <div class="brand">
+            <div class="brand-icon">⚡</div>
+            <span class="brand-text">Pothole Detector</span>
+            <span class="brand-tag">YOLOv8</span>
+          </div>
+          <div class="status-badge">Ready</div>
+        </div>
+      </header>
+
+      <!-- Main -->
+      <main class="main">
+        <div class="container">
+          <!-- Hero -->
+          <div class="hero">
+            <h1 class="hero-title">AI Pothole Detection</h1>
+            <p class="hero-subtitle">
+              Drop or select a road image or video — detection starts
+              automatically
+            </p>
+          </div>
+
+          <!-- Steps -->
+          <nav class="steps">
+            <div class="step">
+              <span class="step-circle" id="step1-circle">1</span>
+              <span class="step-text" id="step1-text">Upload</span>
+            </div>
+            <div class="step-divider" id="step-divider"></div>
+            <div class="step">
+              <span class="step-circle" id="step2-circle">2</span>
+              <span class="step-text" id="step2-text">Results</span>
+            </div>
+          </nav>
+
+          <!-- Upload Card -->
+          <div id="upload-view" class="card upload-card" style="display: block;">
+            <div class="card-header">
+              <h2 class="card-title">Upload Road Image or Video</h2>
+            </div>
+            <div class="card-body">
+              <form id="upload-form">
+                <!-- Upload Type Toggle -->
+                <div class="upload-type-toggle">
+                  <button
+                    type="button"
+                    class="upload-type-btn active"
+                    id="image-btn"
+                    onclick="setUploadType('image')"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <rect
+                        x="3"
+                        y="3"
+                        width="18"
+                        height="18"
+                        rx="2"
+                        ry="2"
+                      ></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    Image
+                  </button>
+                  <button
+                    type="button"
+                    class="upload-type-btn"
+                    id="video-btn"
+                    onclick="setUploadType('video')"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                      <rect
+                        x="1"
+                        y="5"
+                        width="15"
+                        height="14"
+                        rx="2"
+                        ry="2"
+                      ></rect>
+                    </svg>
+                    Video (Processed)
+                  </button>
+                  <button
+                    type="button"
+                    class="upload-type-btn"
+                    id="live-btn"
+                    onclick="setUploadType('live')"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                    </svg>
+                    Live Video
+                  </button>
+                </div>
+
+                <input
+                  type="hidden"
+                  id="upload-type"
+                  name="upload-type"
+                  value="image"
+                />
+
+                <label
+                  for="file"
+                  class="upload-zone"
+                  id="upload-zone"
+                  tabindex="0"
+                >
+                  <input
+                    type="file"
+                    name="file"
+                    id="file"
+                    class="upload-input"
+                    accept="image/*"
+                  />
+
+                  <div class="upload-content">
+                    <div class="upload-icon">☁️</div>
+                    <div class="upload-main-text" id="upload-text">
+                      Drag & Drop or Click to Upload Image
+                    </div>
+                    <div class="upload-hint" id="upload-hint">
+                      Best results with clear road/street photos
+                    </div>
+                    <div class="upload-formats" id="upload-formats">
+                      JPG, PNG, GIF, BMP, WebP • max 16 MB
+                    </div>
+
+                    <div class="file-selected" id="file-selected">
+                      <span class="file-icon">📄</span>
+                      <span id="file-name" class="file-name-text"></span>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Processing UI -->
+                <div id="processing" class="processing" style="display: none">
+                  <div class="spinner"></div>
+                  <span id="processing-text">Analyzing for potholes...</span>
+                </div>
+
+                <div id="error-message" class="error-message">
+                  Please select a file first
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Image Results -->
+          <div id="image-results-view" style="display: none;">
+            <section class="results">
+              <div class="results-stats">
+                <div class="stat-box">
+                  <div class="stat-label">Potholes Found</div>
+                  <div class="stat-value" id="res-image-detected">0</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Status</div>
+                  <div class="stat-value" id="res-image-status">Clear</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Filename</div>
+                  <div class="stat-value filename-value" id="res-image-filename">unknown</div>
+                </div>
+              </div>
+
+              <div class="results-grid">
+                <div class="image-panel">
+                  <div class="image-panel-header">Original</div>
+                  <div class="image-panel-body">
+                    <img src="" alt="Original Image" id="img-original" />
+                  </div>
+                </div>
+                <div class="image-panel">
+                  <div class="image-panel-header highlight">
+                    Detection Result
+                  </div>
+                  <div class="image-panel-body">
+                    <img src="" alt="Detection Result" id="img-result" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="results-action">
+                <button type="button" class="btn btn-secondary" onclick="resetUpload()">Analyze Another File</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- Video Results (Processed) -->
+          <div id="video-results-view" style="display: none;">
+            <section class="video-results">
+              <div class="results-stats">
+                <div class="stat-box">
+                  <div class="stat-label">Total Potholes Detected</div>
+                  <div class="stat-value" id="res-video-detected">0</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Status</div>
+                  <div class="stat-value" id="res-video-status">Clear</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Original File</div>
+                  <div class="stat-value filename-value" id="res-video-filename">unknown</div>
+                </div>
+                <div class="stat-box" id="res-video-fps-box" style="display: none;">
+                  <div class="stat-label">Video FPS</div>
+                  <div class="stat-value" id="res-video-fps">30</div>
+                </div>
+              </div>
+
+              <div class="video-container">
+                <span class="video-label"
+                  >Processed Video with Pothole Detection (Blue Boxes)</span
+                >
+                <video controls id="video-result" playsinline>
+                  <source src="" type="video/mp4" id="video-source" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+
+              <div class="results-action">
+                <button type="button" class="btn btn-secondary" onclick="resetUpload()">Analyze Another File</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- Live Video Results -->
+          <div id="live-video-view" style="display: none;">
+            <section class="video-results">
+              <div class="results-stats">
+                <div class="stat-box">
+                  <div class="stat-label">Mode</div>
+                  <div class="stat-value success">
+                    Live Video <span class="live-mode-badge">LIVE</span>
+                  </div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Status</div>
+                  <div class="stat-value" id="live-status">Processing...</div>
+                </div>
+              </div>
+
+              <div class="video-container" id="live-container">
+                <!-- Video stream will be loaded here -->
+                <div class="loading-stream" id="live-loading">
+                  <div class="spinner"></div>
+                  <p>Loading live video stream...</p>
+                  <p style="font-size: 12px; margin-top: 10px">
+                    Select a video file to start live processing
+                  </p>
+                </div>
+                <img
+                  id="live-stream-img"
+                  style="display: none"
+                  class="live-stream"
+                  alt="Live Detection Stream"
+                />
+              </div>
+
+              <div class="live-controls">
+                <input
+                  type="file"
+                  id="live-video-input"
+                  accept="video/*"
+                  style="display: none"
+                />
+                <button
+                  class="btn btn-primary"
+                  onclick="document.getElementById('live-video-input').click()"
+                >
+                  Select Video File
+                </button>
+                <button
+                  class="btn-stop"
+                  id="stop-live-btn"
+                  style="display: none"
+                  onclick="stopLiveVideo()"
+                >
+                  Stop Live Stream
+                </button>
+              </div>
+
+              <div class="results-action">
+                <button type="button" class="btn btn-secondary" onclick="resetUpload()">Back to Upload</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- Error Display -->
+          <div id="error-display" class="error-display" style="display: none;">
+            <span class="error-icon">⚠️</span>
+            <span id="error-display-text"></span>
+          </div>
+
+          <!-- Footer info row -->
+          <div class="info-grid">
+            <div class="info-card">
+              <div class="info-label">Model</div>
+              <div class="info-value">YOLOv8</div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">Confidence</div>
+              <div class="info-value">≥ 25%</div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">Max Image Size</div>
+              <div class="info-value">16 MB</div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">Max Video Size</div>
+              <div class="info-value">100 MB</div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="footer">
+        Pothole Detection System • Powered by YOLOv8
+      </footer>
+    </div>
+
+    <!-- Modal for full-size image view -->
+    <div class="modal" id="modal">
+      <div class="modal-content">
+        <button class="modal-close" aria-label="Close">×</button>
+        <img src="" alt="Full size preview" id="modal-img" />
+      </div>
+    </div>
+
+    <script>
+      let currentUploadType = 'image';
+      let liveVideoFilename = null;
+      let isLiveStreamActive = false;
+
+      const fileInput = document.getElementById('file');
+      const uploadZone = document.getElementById('upload-zone');
+      const fileSelected = document.getElementById('file-selected');
+      const fileNameEl = document.getElementById('file-name');
+      const errorMsg = document.getElementById('error-message');
+      const form = document.getElementById('upload-form');
+      const uploadView = document.getElementById('upload-view');
+      const imageResultsView = document.getElementById('image-results-view');
+      const videoResultsView = document.getElementById('video-results-view');
+      const liveVideoView = document.getElementById('live-video-view');
+      const processing = document.getElementById('processing');
+      const uploadTypeInput = document.getElementById('upload-type');
+      const imageBtn = document.getElementById('image-btn');
+      const videoBtn = document.getElementById('video-btn');
+      const liveBtn = document.getElementById('live-btn');
+      const uploadText = document.getElementById('upload-text');
+      const uploadHint = document.getElementById('upload-hint');
+      const uploadFormats = document.getElementById('upload-formats');
+      const processingText = document.getElementById('processing-text');
+
+      // Define API Base URL
+      const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+          ? 'http://localhost:5000' 
+          : 'https://mldl-potehole.onrender.com'; // Replace with actual Render URL once deployed
+
+      // Check if we're in live mode on page load
+      const urlParams = new URLSearchParams(window.location.search);
+      // Removed serverLiveMode injection
+      if (urlParams.get('live') === 'true') {
+          currentUploadType = 'live';
+          showLiveMode();
+      }
+
+      function setUploadType(type) {
+          currentUploadType = type;
+          uploadTypeInput.value = type;
+
+          if (type === 'image') {
+              imageBtn.classList.add('active');
+              videoBtn.classList.remove('active');
+              liveBtn.classList.remove('active');
+              fileInput.accept = 'image/*';
+              uploadText.textContent = 'Drag & Drop or Click to Upload Image';
+              uploadHint.textContent = 'Best results with clear road/street photos';
+              uploadFormats.textContent = 'JPG, PNG, GIF, BMP, WebP  •  max 16 MB';
+              uploadZone.style.display = 'flex';
+          } else if (type === 'video') {
+              videoBtn.classList.add('active');
+              imageBtn.classList.remove('active');
+              liveBtn.classList.remove('active');
+              fileInput.accept = 'video/mp4,video/avi,video/mov,video/mkv,video/flv,video/wmv';
+              uploadText.textContent = 'Drag & Drop or Click to Upload Video';
+              uploadHint.textContent = 'Best results with clear road footage';
+              uploadFormats.textContent = 'MP4, AVI, MOV, MKV, FLV, WMV  •  max 100 MB';
+              uploadZone.style.display = 'flex';
+          } else if (type === 'live') {
+              liveBtn.classList.add('active');
+              imageBtn.classList.remove('active');
+              videoBtn.classList.remove('active');
+              // Switch to live video view
+              showLiveMode();
+          }
+      }
+
+      function showLiveMode() {
+          uploadView.style.display = 'none';
+          imageResultsView.style.display = 'none';
+          videoResultsView.style.display = 'none';
+          liveVideoView.style.display = 'block';
+      }
+
+      function handleFile(file) {
+          if (file) {
+              fileNameEl.textContent = file.name;
+              fileSelected.classList.add('show');
+              uploadZone.classList.add('has-file');
+              errorMsg.classList.remove('show');
+
+              // Auto-submit the form
+              if (currentUploadType !== 'live') {
+                  submitForm();
+              }
+          } else {
+              fileSelected.classList.remove('show');
+              uploadZone.classList.remove('has-file');
+          }
+      }
+
+      function submitForm() {
+          if (!fileInput.files?.length) {
+              errorMsg.classList.add('show');
+              return;
+          }
+
+          const formData = new FormData(form);
+
+          // Show processing UI
+          uploadZone.style.display = 'none';
+          processing.style.display = 'flex';
+
+          if (currentUploadType === 'video') {
+              processingText.textContent = 'Processing video frames... This may take a while.';
+          } else {
+              processingText.textContent = 'Analyzing image for potholes...';
+          }
+
+          fetch(`${API_BASE_URL}/upload`, {
+              method: 'POST',
+              body: formData
+          })
+          .then(response => {
+              if (!response.ok) {
+                  return response.json().then(err => { throw new Error(err.error || 'Server error') });
+              }
+              return response.json();
+          })
+          .then(data => {
+              if (data.status === 'success') {
+                  // Hide upload view
+                  uploadView.style.display = 'none';
+
+                  // Update UI Steps
+                  document.getElementById('step1-circle').classList.add('done');
+                  document.getElementById('step1-text').classList.add('done');
+                  document.getElementById('step-divider').classList.add('done');
+                  document.getElementById('step2-circle').classList.add('active');
+                  document.getElementById('step2-text').classList.add('active');
+
+                  if (!data.is_video) {
+                      // Show image results
+                      document.getElementById('res-image-detected').textContent = data.num_detections;
+                      document.getElementById('res-image-detected').className = `stat-value ${data.num_detections > 0 ? 'success' : 'warning'}`;
+                      document.getElementById('res-image-status').textContent = data.num_detections > 0 ? 'Detected' : 'Clear';
+                      document.getElementById('res-image-status').className = `stat-value ${data.num_detections > 0 ? 'success' : 'warning'}`;
+                      document.getElementById('res-image-filename').textContent = data.filename;
+                      
+                      document.getElementById('img-original').src = `${API_BASE_URL}${data.original_image}`;
+                      document.getElementById('img-result').src = `${API_BASE_URL}${data.result_image}`;
+                      
+                      imageResultsView.style.display = 'block';
+                      attachModalHandlers();
+                  } else {
+                      // Show video results
+                      document.getElementById('res-video-detected').textContent = data.num_detections;
+                      document.getElementById('res-video-detected').className = `stat-value ${data.num_detections > 0 ? 'success' : 'warning'}`;
+                      document.getElementById('res-video-status').textContent = data.num_detections > 0 ? 'Detected' : 'Clear';
+                      document.getElementById('res-video-status').className = `stat-value ${data.num_detections > 0 ? 'success' : 'warning'}`;
+                      document.getElementById('res-video-filename').textContent = data.filename;
+                      
+                      if (data.video_fps) {
+                          document.getElementById('res-video-fps').textContent = data.video_fps;
+                          document.getElementById('res-video-fps-box').style.display = 'block';
+                      }
+                      
+                      const videoResult = document.getElementById('video-result');
+                      videoResult.src = `${API_BASE_URL}${data.result_video}`;
+                      videoResult.load();
+                      
+                      videoResultsView.style.display = 'block';
+                  }
+              } else {
+                  throw new Error(data.error || 'Unknown error occurred');
+              }
+          })
+          .catch(err => {
+              console.error('Error:', err);
+              uploadZone.style.display = 'flex';
+              processing.style.display = 'none';
+              errorMsg.textContent = err.message || 'Error processing file. Please try again.';
+              errorMsg.classList.add('show');
+          });
+      }
+
+      function resetUpload() {
+          // Reset UI
+          uploadView.style.display = 'block';
+          imageResultsView.style.display = 'none';
+          videoResultsView.style.display = 'none';
+          liveVideoView.style.display = 'none';
+          
+          uploadZone.style.display = 'flex';
+          processing.style.display = 'none';
+          fileInput.value = '';
+          handleFile(null);
+          
+          // Reset Steps
+          document.getElementById('step1-circle').className = 'step-circle active';
+          document.getElementById('step1-text').className = 'step-text active';
+          document.getElementById('step-divider').className = 'step-divider';
+          document.getElementById('step2-circle').className = 'step-circle';
+          document.getElementById('step2-text').className = 'step-text';
+      }
+
+      // Live Video Functions
+      const liveVideoInput = document.getElementById('live-video-input');
+      const liveStreamImg = document.getElementById('live-stream-img');
+      const liveLoading = document.getElementById('live-loading');
+      const stopLiveBtn = document.getElementById('stop-live-btn');
+      const liveStatus = document.getElementById('live-status');
+
+      liveVideoInput.addEventListener('change', function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          // Upload the video and start live stream
+          startLiveVideo(file);
+      });
+
+      function startLiveVideo(file) {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          liveLoading.innerHTML = '<div class="spinner"></div><p>Starting live video stream...</p>';
+          liveLoading.style.display = 'block';
+          liveStreamImg.style.display = 'none';
+
+          fetch(`${API_BASE_URL}/start_live_video`, {
+              method: 'POST',
+              body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  liveVideoFilename = data.filename;
+                  isLiveStreamActive = true;
+
+                  // Start the video stream
+                  const streamUrl = `${API_BASE_URL}/video_feed/${liveVideoFilename}`;
+                  liveStreamImg.src = streamUrl;
+                  liveStreamImg.style.display = 'block';
+                  liveLoading.style.display = 'none';
+                  stopLiveBtn.style.display = 'block';
+                  liveStatus.textContent = 'Streaming & Detecting';
+                  liveStatus.classList.add('success');
+
+                  // Handle stream errors
+                  liveStreamImg.onerror = function() {
+                      liveStatus.textContent = 'Error loading stream';
+                      liveStatus.classList.remove('success');
+                  };
+              } else {
+                  liveLoading.innerHTML = `<div class="error-stream">${data.error || 'Error starting video'}</div>`;
+              }
+          })
+          .catch(err => {
+              console.error('Error:', err);
+              liveLoading.innerHTML = `<div class="error-stream">Error starting live video. Please try again.</div>`;
+          });
+      }
+
+      function stopLiveVideo() {
+          fetch(`${API_BASE_URL}/stop_live_video`, {
+              method: 'POST'
+          })
+          .then(response => response.json())
+          .then(data => {
+              isLiveStreamActive = false;
+              liveVideoFilename = null;
+              liveStreamImg.src = '';
+              liveStreamImg.style.display = 'none';
+              liveLoading.innerHTML = '<div class="spinner"></div><p>Select a video file to start live processing</p>';
+              liveLoading.style.display = 'block';
+              stopLiveBtn.style.display = 'none';
+              liveStatus.textContent = 'Stopped';
+              liveStatus.classList.remove('success');
+          })
+          .catch(err => {
+              console.error('Error stopping video:', err);
+          });
+      }
+
+      function attachModalHandlers() {
+          document.querySelectorAll('.image-panel-body img').forEach(img => {
+              img.addEventListener('click', () => {
+                  document.getElementById('modal-img').src = img.src;
+                  document.getElementById('modal').classList.add('active');
+              });
+          });
+      }
+
+      fileInput.addEventListener('change', () => {
+          handleFile(fileInput.files[0]);
+      });
+
+      // Drag & drop
+      uploadZone.addEventListener('dragover', e => {
+          e.preventDefault();
+          uploadZone.classList.add('dragover');
+      });
+
+      uploadZone.addEventListener('dragleave', () => {
+          uploadZone.classList.remove('dragover');
+      });
+
+      uploadZone.addEventListener('drop', e => {
+          e.preventDefault();
+          uploadZone.classList.remove('dragover');
+          if (e.dataTransfer.files.length) {
+              fileInput.files = e.dataTransfer.files;
+              handleFile(e.dataTransfer.files[0]);
+          }
+      });
+
+      // Keyboard accessibility
+      uploadZone.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInput.click();
+          }
+      });
+
+      // Modal handlers
+      document.querySelector('.modal-close').addEventListener('click', () => {
+          document.getElementById('modal').classList.remove('active');
+      });
+      document.getElementById('modal').addEventListener('click', e => {
+          if (e.target.id === 'modal') {
+              document.getElementById('modal').classList.remove('active');
+          }
+      });
+      document.addEventListener('keydown', e => {
+          if (e.key === 'Escape') {
+              document.getElementById('modal').classList.remove('active');
+          }
+      });
+
+      // Initial modal attachment
+      attachModalHandlers();
+    </script>
+  </body>
+</html>

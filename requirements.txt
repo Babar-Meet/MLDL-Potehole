@@ -1,6 +1,7 @@
 # Flask Web Application Dependencies
 flask>=2.3.0
 werkzeug>=2.3.0
+flask-cors>=5.0.0
 
 # Ultralytics YOLOv8
 ultralytics>=8.0.0
