@@ -9,6 +9,7 @@ Supports live real-time video streaming.
 import os
 import cv2
 import numpy as np
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory, Response, render_template, flash, redirect
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -46,6 +47,9 @@ LINE_THICKNESS = 4
 
 # Blue color for bounding boxes (BGR format)
 BOX_COLOR = (255, 0, 0)  # Blue
+
+# Build timestamp - captures when the application was deployed/started
+BUILD_TIMESTAMP = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
 
 # Configure Flask
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -155,7 +159,7 @@ def index():
     Returns:
         Rendered HTML template
     """
-    return render_template('index.html', live_mode=False, result_image=None, original_image=None, filename=None, result_video=None, error=None, processing=False, num_detections=0)
+    return render_template('index.html', live_mode=False, result_image=None, original_image=None, filename=None, result_video=None, error=None, processing=False, num_detections=0, build_timestamp=BUILD_TIMESTAMP)
 
 @app.route('/health')
 def health():
@@ -166,6 +170,20 @@ def health():
         JSON status message
     """
     return jsonify({"status": "healthy"})
+
+
+@app.route('/build-info')
+def build_info():
+    """
+    Return build/deployment timestamp information.
+    
+    Returns:
+        JSON response with build timestamp
+    """
+    return jsonify({
+        "build_timestamp": BUILD_TIMESTAMP,
+        "message": "Application build/deployment timestamp"
+    })
 
 
 @app.route('/upload', methods=['POST'])
