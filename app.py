@@ -1,9 +1,9 @@
 """
 Flask Web Application for Pothole Detection using YOLOv8
 
-This application provides a web interface for uploading images and videos
+This application provides a web interface for uploading images
 and detecting potholes using a trained YOLOv8 model.
-Supports both batch processing and live real-time video streaming.
+Supports live real-time video streaming.
 """
 
 import os
@@ -172,10 +172,10 @@ def health():
 def upload_file():
     """
     Handle file upload, run inference, and display results.
-    Supports both images and videos.
+    Supports images only. Videos are handled via live video streaming.
     
     Returns:
-        Rendered HTML template with results or error
+        JSON response with results or error
     """
     # Check if model is loaded
     if model is None:
@@ -192,12 +192,10 @@ def upload_file():
         return jsonify({'error': 'No file selected. Please choose a file.'}), 400
     
     # Check file type and process accordingly
-    if allowed_video_file(file.filename):
-        return process_video(file)
-    elif allowed_image_file(file.filename):
+    if allowed_image_file(file.filename):
         return process_image(file)
     else:
-        return jsonify({'error': 'Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp) or video (mp4, avi, mov, mkv).'}), 400
+        return jsonify({'error': 'Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp).'}), 400
 
 
 @app.route('/live-video')
@@ -431,6 +429,13 @@ def process_image(file):
         original_url = f'/uploads/{filename}'
         result_url = f'/results/output/{result_filename}'
         
+        # Count detections
+        num_detections = 0
+        if results and len(results) > 0:
+            result = results[0]
+            if result.boxes is not None:
+                num_detections = len(result.boxes)
+        
         return jsonify({
             'status': 'success',
             'original_image': original_url,
@@ -442,120 +447,6 @@ def process_image(file):
         
     except Exception as e:
         return jsonify({'error': f'Error processing image: {str(e)}'}), 500
-
-
-def process_video(file):
-    """
-    Process an uploaded video and detect potholes in each frame.
-    Draws blue bounding boxes around detected potholes.
-    
-    Args:
-        file: The uploaded file object
-        
-    Returns:
-        Rendered HTML template with video results
-    """
-    try:
-        # Secure the filename and create unique name
-        original_filename = secure_filename(file.filename)
-        filename = original_filename
-        counter = 1
-        while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
-            name, ext = os.path.splitext(original_filename)
-            filename = f"{name}_{counter}{ext}"
-            counter += 1
-        
-        # Save uploaded video
-        upload_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(upload_path)
-        
-        # Open video for processing
-        cap = cv2.VideoCapture(upload_path)
-        
-        if not cap.isOpened():
-            return jsonify({'error': 'Error: Could not open video file.'}), 500
-        
-        # Get video properties
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
-        # Output video settings
-        output_filename = f"result_{os.path.splitext(filename)[0]}.mp4"
-        output_path = os.path.join(RESULTS_FOLDER, 'output', output_filename)
-        
-        # Create output directory if it doesn't exist
-        os.makedirs(os.path.join(RESULTS_FOLDER, 'output'), exist_ok=True)
-        
-        # Define video codec and create VideoWriter
-        # Try different codecs
-        fourcc = None
-        for codec in ['mp4v', 'avc1', 'H264', 'XVID']:
-            try:
-                fourcc = cv2.VideoWriter_fourcc(*codec)
-                out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-                if out.isOpened():
-                    break
-            except:
-                continue
-        
-        if fourcc is None or not out.isOpened():
-            # Fallback: use mp4v
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-        
-        # Process each frame
-        frame_count = 0
-        total_detections = 0
-        
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            # Run YOLOv8 inference on this frame
-            results = model.predict(
-                source=frame,
-                conf=CONFIDENCE_THRESHOLD,
-                save=False,
-                verbose=False
-            )
-            
-            # Count detections in this frame
-            if results and len(results) > 0:
-                result = results[0]
-                if result.boxes is not None:
-                    total_detections += len(result.boxes)
-            
-            # Draw blue bounding boxes on the frame
-            frame_with_boxes = draw_detections(frame, results)
-            
-            # Write the processed frame to output video
-            out.write(frame_with_boxes)
-            
-            frame_count += 1
-        
-        # Release video objects
-        cap.release()
-        out.release()
-        
-        # Prepare URLs for display
-        original_url = f'/uploads/{filename}'
-        result_url = f'/results/output/{output_filename}'
-        
-        return jsonify({
-            'status': 'success',
-            'original_video': original_url,
-            'result_video': result_url,
-            'num_detections': total_detections,
-            'filename': filename,
-            'is_video': True,
-            'video_fps': fps
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Error processing video: {str(e)}'}), 500
 
 
 @app.route('/uploads/<path:filename>')

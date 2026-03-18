@@ -74,6 +74,37 @@
         max-height: 70vh;
       }
 
+      /* Live Video Stream - Fixed CSS */
+      .live-stream {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 8px;
+        background-color: #000;
+      }
+
+      #live-container {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #live-container img.live-stream {
+        width: 100%;
+        height: auto;
+        max-height: 70vh;
+        object-fit: contain;
+      }
+
       .video-stats {
         display: flex;
         gap: 20px;
@@ -192,8 +223,7 @@
           <div class="hero">
             <h1 class="hero-title">AI Pothole Detection</h1>
             <p class="hero-subtitle">
-              Drop or select a road image or video — detection starts
-              automatically
+              Drop or select a road image — detection starts automatically
             </p>
           </div>
 
@@ -201,26 +231,26 @@
           <nav class="steps">
             <div class="step">
               <span
-                class="step-circle {% if processing or result_image or result_video or live_mode %}done{% elif processing %}active{% endif %}"
+                class="step-circle {% if processing or result_image or live_mode %}done{% elif processing %}active{% endif %}"
               >
-                {% if processing or result_image or result_video or live_mode
-                %}✓{% else %}1{% endif %}
+                {% if processing or result_image or live_mode %}✓{% else %}1{%
+                endif %}
               </span>
               <span
-                class="step-text {% if processing or result_image or result_video or live_mode %}done{% endif %}"
+                class="step-text {% if processing or result_image or live_mode %}done{% endif %}"
                 >Upload</span
               >
             </div>
             <div
-              class="step-divider {% if result_image or result_video or live_mode %}done{% endif %}"
+              class="step-divider {% if result_image or live_mode %}done{% endif %}"
             ></div>
             <div class="step">
               <span
-                class="step-circle {% if result_image or result_video or live_mode %}active{% elif processing %}active{% endif %}"
+                class="step-circle {% if result_image or live_mode %}active{% elif processing %}active{% endif %}"
                 >2</span
               >
               <span
-                class="step-text {% if result_image or result_video or live_mode or processing %}active{% endif %}"
+                class="step-text {% if result_image or live_mode or processing %}active{% endif %}"
                 >Results</span
               >
             </div>
@@ -233,7 +263,7 @@
             style="display: {% if not result_image and not result_video and not error and not live_mode %}block{% else %}none{% endif %};"
           >
             <div class="card-header">
-              <h2 class="card-title">Upload Road Image or Video</h2>
+              <h2 class="card-title">Upload Road Image</h2>
             </div>
             <div class="card-body">
               <form
@@ -268,30 +298,6 @@
                       <polyline points="21 15 16 10 5 21"></polyline>
                     </svg>
                     Image
-                  </button>
-                  <button
-                    type="button"
-                    class="upload-type-btn"
-                    id="video-btn"
-                    onclick="setUploadType('video')"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                      <rect
-                        x="1"
-                        y="5"
-                        width="15"
-                        height="14"
-                        rx="2"
-                        ry="2"
-                      ></rect>
-                    </svg>
-                    Video (Processed)
                   </button>
                   <button
                     type="button"
@@ -428,60 +434,6 @@
             {% endif %}
           </div>
 
-          <!-- Video Results (Processed) -->
-          <div
-            id="video-results-view"
-            style="display: {% if result_video %}block{% else %}none{% endif %};"
-          >
-            {% if result_video %}
-            <section class="video-results">
-              <div class="results-stats">
-                <div class="stat-box">
-                  <div class="stat-label">Total Potholes Detected</div>
-                  <div
-                    class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}"
-                  >
-                    {{ num_detections }}
-                  </div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-label">Status</div>
-                  <div
-                    class="stat-value {% if num_detections > 0 %}success{% else %}warning{% endif %}"
-                  >
-                    {% if num_detections > 0 %}Detected{% else %}Clear{% endif
-                    %}
-                  </div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-label">Original File</div>
-                  <div class="stat-value filename-value">{{ filename }}</div>
-                </div>
-                {% if video_fps %}
-                <div class="stat-box">
-                  <div class="stat-label">Video FPS</div>
-                  <div class="stat-value">{{ video_fps }}</div>
-                </div>
-                {% endif %}
-              </div>
-
-              <div class="video-container">
-                <span class="video-label"
-                  >Processed Video with Pothole Detection (Blue Boxes)</span
-                >
-                <video controls id="video-result" playsinline>
-                  <source src="{{ result_video }}" type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-
-              <div class="results-action">
-                <a href="/" class="btn btn-secondary">Analyze Another File</a>
-              </div>
-            </section>
-            {% endif %}
-          </div>
-
           <!-- Live Video Results -->
           <div
             id="live-video-view"
@@ -570,8 +522,8 @@
               <div class="info-value">16 MB</div>
             </div>
             <div class="info-card">
-              <div class="info-label">Max Video Size</div>
-              <div class="info-value">100 MB</div>
+              <div class="info-label">Live Video</div>
+              <div class="info-value">Supported</div>
             </div>
           </div>
         </div>
@@ -604,12 +556,10 @@
       const form = document.getElementById('upload-form');
       const uploadView = document.getElementById('upload-view');
       const imageResultsView = document.getElementById('image-results-view');
-      const videoResultsView = document.getElementById('video-results-view');
       const liveVideoView = document.getElementById('live-video-view');
       const processing = document.getElementById('processing');
       const uploadTypeInput = document.getElementById('upload-type');
       const imageBtn = document.getElementById('image-btn');
-      const videoBtn = document.getElementById('video-btn');
       const liveBtn = document.getElementById('live-btn');
       const uploadText = document.getElementById('upload-text');
       const uploadHint = document.getElementById('upload-hint');
@@ -630,26 +580,15 @@
 
           if (type === 'image') {
               imageBtn.classList.add('active');
-              videoBtn.classList.remove('active');
               liveBtn.classList.remove('active');
               fileInput.accept = 'image/*';
               uploadText.textContent = 'Drag & Drop or Click to Upload Image';
               uploadHint.textContent = 'Best results with clear road/street photos';
               uploadFormats.textContent = 'JPG, PNG, GIF, BMP, WebP  •  max 16 MB';
               uploadZone.style.display = 'flex';
-          } else if (type === 'video') {
-              videoBtn.classList.add('active');
-              imageBtn.classList.remove('active');
-              liveBtn.classList.remove('active');
-              fileInput.accept = 'video/mp4,video/avi,video/mov,video/mkv,video/flv,video/wmv';
-              uploadText.textContent = 'Drag & Drop or Click to Upload Video';
-              uploadHint.textContent = 'Best results with clear road footage';
-              uploadFormats.textContent = 'MP4, AVI, MOV, MKV, FLV, WMV  •  max 100 MB';
-              uploadZone.style.display = 'flex';
           } else if (type === 'live') {
               liveBtn.classList.add('active');
               imageBtn.classList.remove('active');
-              videoBtn.classList.remove('active');
               // Switch to live video view
               showLiveMode();
           }
@@ -658,7 +597,6 @@
       function showLiveMode() {
           uploadView.style.display = 'none';
           imageResultsView.style.display = 'none';
-          videoResultsView.style.display = 'none';
           liveVideoView.style.display = 'block';
       }
 
@@ -690,12 +628,7 @@
           // Show processing UI
           uploadZone.style.display = 'none';
           processing.style.display = 'flex';
-
-          if (currentUploadType === 'video') {
-              processingText.textContent = 'Processing video frames... This may take a while.';
-          } else {
-              processingText.textContent = 'Analyzing image for potholes...';
-          }
+          processingText.textContent = 'Analyzing image for potholes...';
 
           fetch('/upload', {
               method: 'POST',
@@ -709,7 +642,6 @@
               // Check for errors
               const errorDisplay = doc.querySelector('#error-display');
               const imageResultsSection = doc.querySelector('#image-results-view .results');
-              const videoResultsSection = doc.querySelector('#video-results-view .video-results');
 
               if (errorDisplay) {
                   // Show error
@@ -718,28 +650,18 @@
                   processing.style.display = 'none';
                   errorMsg.textContent = errorText;
                   errorMsg.classList.add('show');
-              } else if (imageResultsSection || videoResultsSection) {
+              } else if (imageResultsSection) {
                   // Hide upload view
                   uploadView.style.display = 'none';
 
-                  // Show image results if present
-                  if (imageResultsSection) {
-                      const newResults = document.importNode(imageResultsSection, true);
-                      imageResultsView.innerHTML = '';
-                      imageResultsView.appendChild(newResults);
-                      imageResultsView.style.display = 'block';
+                  // Show image results
+                  const newResults = document.importNode(imageResultsSection, true);
+                  imageResultsView.innerHTML = '';
+                  imageResultsView.appendChild(newResults);
+                  imageResultsView.style.display = 'block';
 
-                      // Re-attach modal handlers
-                      attachModalHandlers();
-                  }
-
-                  // Show video results if present
-                  if (videoResultsSection) {
-                      const newVideoResults = document.importNode(videoResultsSection, true);
-                      videoResultsView.innerHTML = '';
-                      videoResultsView.appendChild(newVideoResults);
-                      videoResultsView.style.display = 'block';
-                  }
+                  // Re-attach modal handlers
+                  attachModalHandlers();
               }
           })
           .catch(err => {
