@@ -134,10 +134,7 @@ dataset/
 dataset_Yolo/
 datasets/
 
-# Model files (large binary files)
-*.pt
-*.pth
-*.h5
+# Model files - ALLOW pothole_yolo folder for deployment
 *.pkl
 *.pickle
 *.weights
@@ -150,7 +147,7 @@ outputs/
 predictions/
 models/
 
-# YOLO specific
+# YOLO specific (EXCEPT pothole_yolo which is needed for deployment)
 yolov5/
 yolov8/
 yolo/
@@ -169,6 +166,5 @@ logs/
 .DS_Store
 Thumbs.db
 
-pothole_yolo/
-pothole_yolo.zip
-dataset.zip
+# pothole_yolo/ - KEEP THIS FOR DEPLOYMENT (contains best.pt model)
+# NOTE: Do NOT ignore pothole_yolo/ folder - it's needed for deployment
