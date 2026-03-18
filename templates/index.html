@@ -25,7 +25,7 @@
             <span class="brand-text">Pothole Detector</span>
             <span class="brand-tag">YOLOv8</span>
           </div>
-          <div class="status-badge">Ready</div>
+          <div class="status-badge" id="status-badge">Ready</div>
         </div>
       </header>
 
@@ -115,8 +115,8 @@
                   <button
                     type="button"
                     class="upload-type-btn"
-                    id="live-btn"
-                    onclick="setUploadType('live')"
+                    id="video-btn"
+                    onclick="setUploadType('video')"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -127,7 +127,26 @@
                       <circle cx="12" cy="12" r="10"></circle>
                       <polygon points="10 8 16 12 10 16 10 8"></polygon>
                     </svg>
-                    Live Video
+                    Video
+                  </button>
+                  <button
+                    type="button"
+                    class="upload-type-btn"
+                    id="live-btn"
+                    onclick="setUploadType('live')"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    Live
                   </button>
                 </div>
 
@@ -171,10 +190,26 @@
                   </div>
                 </label>
 
+                <!-- Progress Bar -->
+                <div id="upload-progress-container" class="progress-container" style="display: none">
+                  <div class="progress-bar">
+                    <div id="upload-progress" class="progress-fill"></div>
+                  </div>
+                  <div class="progress-text" id="upload-progress-text">0%</div>
+                </div>
+
                 <!-- Processing UI -->
                 <div id="processing" class="processing" style="display: none">
                   <div class="spinner"></div>
                   <span id="processing-text">Analyzing for potholes...</span>
+                </div>
+
+                <!-- Video Processing Status -->
+                <div id="video-processing-status" class="processing-status" style="display: none">
+                  <div class="status-progress-bar">
+                    <div id="status-progress-fill" class="status-progress-fill"></div>
+                  </div>
+                  <div class="status-text" id="status-text">Initializing...</div>
                 </div>
 
                 <div id="error-message" class="error-message">
@@ -223,6 +258,7 @@
                       src="{{ original_image }}"
                       alt="Original Image"
                       id="img-original"
+                      onerror="this.onerror=null; this.src='/uploads/{{ filename }}'"
                     />
                   </div>
                 </div>
@@ -235,6 +271,7 @@
                       src="{{ result_image }}"
                       alt="Detection Result"
                       id="img-result"
+                      onerror="this.onerror=null; this.src='/results/output/{{ filename }}'.replace('.jpg', '.jpg')"
                     />
                   </div>
                 </div>
@@ -245,6 +282,51 @@
               </div>
             </section>
             {% endif %}
+          </div>
+
+          <!-- Video Results -->
+          <div
+            id="video-results-view"
+            style="display: none;"
+          >
+            <section class="video-results">
+              <div class="results-stats">
+                <div class="stat-box">
+                  <div class="stat-label">Mode</div>
+                  <div class="stat-value success">
+                    Video Upload <span class="live-mode-badge">UPLOADED</span>
+                  </div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Status</div>
+                  <div class="stat-value" id="video-status">Processing...</div>
+                </div>
+              </div>
+
+              <div class="video-container" id="video-container">
+                <!-- Video stream will be loaded here -->
+                <div class="loading-stream" id="video-loading">
+                  <div class="spinner"></div>
+                  <p>Processing video for pothole detection...</p>
+                  <p style="font-size: 12px; margin-top: 10px" id="video-loading-text">
+                    This may take a few minutes depending on video length
+                  </p>
+                </div>
+                <video
+                  id="video-player"
+                  controls
+                  style="display: none"
+                  class="video-player"
+                >
+                  <source id="video-source" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+
+              <div class="results-action">
+                <a href="/" class="btn btn-secondary">Back to Upload</a>
+              </div>
+            </section>
           </div>
 
           <!-- Live Video Results -->
@@ -335,7 +417,7 @@
               <div class="info-value">16 MB</div>
             </div>
             <div class="info-card">
-              <div class="info-label">Live Video</div>
+              <div class="info-label">Video Upload</div>
               <div class="info-value">Supported</div>
             </div>
           </div>
@@ -344,7 +426,9 @@
 
       <!-- Footer -->
       <footer class="footer">
-        Pothole Detection System • Powered by YOLOv8
+        <span class="footer-text">Pothole Detection System • Powered by YOLOv8</span>
+        <span class="footer-separator">•</span>
+        <span id="deploy-timestamp" class="deploy-timestamp">Loading deployment time...</span>
       </footer>
     </div>
 
@@ -357,9 +441,40 @@
     </div>
 
     <script>
+      // Build timestamp from server
+      const BUILD_TIMESTAMP_ISO = {{ build_timestamp_iso|tojson }};
+      const BUILD_TIMESTAMP = {{ build_timestamp|tojson }};
+
+      // Calculate and display deployment time
+      function updateDeployTimestamp() {
+        const deployTime = new Date(BUILD_TIMESTAMP_ISO);
+        const now = new Date();
+        const diffMs = now - deployTime;
+        
+        const diffSecs = Math.floor(diffMs / 1000);
+        const days = Math.floor(diffSecs / 86400);
+        const hours = Math.floor((diffSecs % 86400) / 3600);
+        const minutes = Math.floor((diffSecs % 3600) / 60);
+        const seconds = diffSecs % 60;
+        
+        const timeStr = 
+          (days > 0 ? days + 'd ' : '') +
+          hours + 'h ' +
+          minutes + 'm ' +
+          seconds + 's';
+        
+        document.getElementById('deploy-timestamp').textContent = 'Deployed: ' + timeStr + ' ago';
+      }
+      
+      // Update timestamp every second
+      updateDeployTimestamp();
+      setInterval(updateDeployTimestamp, 1000);
+
       let currentUploadType = 'image';
       let liveVideoFilename = null;
       let isLiveStreamActive = false;
+      let currentVideoJobId = null;
+      let videoStatusInterval = null;
 
       const fileInput = document.getElementById('file');
       const uploadZone = document.getElementById('upload-zone');
@@ -369,15 +484,26 @@
       const form = document.getElementById('upload-form');
       const uploadView = document.getElementById('upload-view');
       const imageResultsView = document.getElementById('image-results-view');
+      const videoResultsView = document.getElementById('video-results-view');
       const liveVideoView = document.getElementById('live-video-view');
       const processing = document.getElementById('processing');
       const uploadTypeInput = document.getElementById('upload-type');
       const imageBtn = document.getElementById('image-btn');
+      const videoBtn = document.getElementById('video-btn');
       const liveBtn = document.getElementById('live-btn');
       const uploadText = document.getElementById('upload-text');
       const uploadHint = document.getElementById('upload-hint');
       const uploadFormats = document.getElementById('upload-formats');
       const processingText = document.getElementById('processing-text');
+      const statusBadge = document.getElementById('status-badge');
+
+      // Progress elements
+      const uploadProgressContainer = document.getElementById('upload-progress-container');
+      const uploadProgress = document.getElementById('upload-progress');
+      const uploadProgressText = document.getElementById('upload-progress-text');
+      const videoProcessingStatus = document.getElementById('video-processing-status');
+      const statusProgressFill = document.getElementById('status-progress-fill');
+      const statusText = document.getElementById('status-text');
 
       // Check if we're in live mode on page load
       const urlParams = new URLSearchParams(window.location.search);
@@ -391,18 +517,30 @@
           currentUploadType = type;
           uploadTypeInput.value = type;
 
+          // Reset UI
+          imageBtn.classList.remove('active');
+          videoBtn.classList.remove('active');
+          liveBtn.classList.remove('active');
+          uploadProgressContainer.style.display = 'none';
+          videoProcessingStatus.style.display = 'none';
+          processing.style.display = 'none';
+
           if (type === 'image') {
               imageBtn.classList.add('active');
-              liveBtn.classList.remove('active');
               fileInput.accept = 'image/*';
               uploadText.textContent = 'Drag & Drop or Click to Upload Image';
               uploadHint.textContent = 'Best results with clear road/street photos';
               uploadFormats.textContent = 'JPG, PNG, GIF, BMP, WebP  •  max 16 MB';
               uploadZone.style.display = 'flex';
+          } else if (type === 'video') {
+              videoBtn.classList.add('active');
+              fileInput.accept = 'video/*';
+              uploadText.textContent = 'Drag & Drop or Click to Upload Video';
+              uploadHint.textContent = 'Upload video for batch pothole detection';
+              uploadFormats.textContent = 'MP4, AVI, MOV, MKV  •  max 100 MB';
+              uploadZone.style.display = 'flex';
           } else if (type === 'live') {
               liveBtn.classList.add('active');
-              imageBtn.classList.remove('active');
-              // Switch to live video view
               showLiveMode();
           }
       }
@@ -410,19 +548,50 @@
       function showLiveMode() {
           uploadView.style.display = 'none';
           imageResultsView.style.display = 'none';
+          videoResultsView.style.display = 'none';
           liveVideoView.style.display = 'block';
+      }
+
+      function showVideoResults() {
+          uploadView.style.display = 'none';
+          imageResultsView.style.display = 'none';
+          liveVideoView.style.display = 'none';
+          videoResultsView.style.display = 'block';
+      }
+
+      function showUploadView() {
+          uploadView.style.display = 'block';
+          imageResultsView.style.display = 'none';
+          videoResultsView.style.display = 'none';
+          liveVideoView.style.display = 'none';
+      }
+
+      function showError(message) {
+          errorMsg.textContent = message;
+          errorMsg.classList.add('show');
+          uploadZone.style.display = 'flex';
+          processing.style.display = 'none';
+          uploadProgressContainer.style.display = 'none';
+          videoProcessingStatus.style.display = 'none';
+      }
+
+      function hideError() {
+          errorMsg.classList.remove('show');
       }
 
       function handleFile(file) {
           if (file) {
+              hideError();
               fileNameEl.textContent = file.name;
               fileSelected.classList.add('show');
               uploadZone.classList.add('has-file');
-              errorMsg.classList.remove('show');
 
-              // Auto-submit the form
-              if (currentUploadType !== 'live') {
+              // Auto-submit for images
+              if (currentUploadType === 'image') {
                   submitForm();
+              } else if (currentUploadType === 'video') {
+                  // Start chunked upload for videos
+                  uploadVideoChunked(file);
               }
           } else {
               fileSelected.classList.remove('show');
@@ -430,9 +599,125 @@
           }
       }
 
+      // Chunked video upload
+      const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+      let fileId = null;
+
+      async function uploadVideoChunked(file) {
+          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+          fileId = file.name + '_' + Date.now();
+          
+          // Show progress UI
+          uploadZone.style.display = 'none';
+          uploadProgressContainer.style.display = 'block';
+          statusBadge.textContent = 'Uploading';
+          statusBadge.classList.add('loading');
+
+          try {
+              for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                  const start = chunkIndex * CHUNK_SIZE;
+                  const end = Math.min(start + CHUNK_SIZE, file.size);
+                  const chunk = file.slice(start, end);
+                  
+                  const formData = new FormData();
+                  formData.append('chunk', chunk);
+                  formData.append('chunkIndex', chunkIndex);
+                  formData.append('totalChunks', totalChunks);
+                  formData.append('filename', file.name);
+                  formData.append('fileId', fileId);
+
+                  const response = await fetch('/upload-video-chunk', {
+                      method: 'POST',
+                      body: formData
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (data.status !== 'success') {
+                      throw new Error(data.message || 'Chunk upload failed');
+                  }
+                  
+                  // Update progress
+                  const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                  uploadProgress.style.width = progress + '%';
+                  uploadProgressText.textContent = progress + '%';
+              }
+
+              // All chunks uploaded, start processing
+              statusBadge.textContent = 'Processing';
+              uploadProgressContainer.style.display = 'none';
+              videoProcessingStatus.style.display = 'block';
+              
+              const processResponse = await fetch('/process-chunked-video', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ fileId: fileId })
+              });
+              
+              const processData = await processResponse.json();
+              
+              if (processData.status !== 'success') {
+                  throw new Error(processData.message || 'Processing failed');
+              }
+              
+              currentVideoJobId = processData.jobId;
+              startVideoStatusPolling();
+
+          } catch (error) {
+              console.error('Upload error:', error);
+              showError('Error uploading video: ' + error.message);
+              statusBadge.textContent = 'Error';
+              statusBadge.classList.remove('loading');
+          }
+      }
+
+      function startVideoStatusPolling() {
+          videoStatusInterval = setInterval(async () => {
+              if (!currentVideoJobId) return;
+              
+              try {
+                  const response = await fetch('/video-chunk-status/' + currentVideoJobId);
+                  const data = await response.json();
+                  
+                  // Update progress UI
+                  statusProgressFill.style.width = data.progress + '%';
+                  statusText.textContent = data.stage;
+                  
+                  if (data.status === 'completed') {
+                      clearInterval(videoStatusInterval);
+                      statusBadge.textContent = 'Complete';
+                      statusBadge.classList.remove('loading');
+                      statusBadge.classList.add('success');
+                      
+                      // Show video player
+                      const videoPlayer = document.getElementById('video-player');
+                      const videoSource = document.getElementById('video-source');
+                      const videoLoading = document.getElementById('video-loading');
+                      
+                      videoSource.src = '/uploads/' + data.result_filename;
+                      videoPlayer.style.display = 'block';
+                      videoLoading.style.display = 'none';
+                      
+                      showVideoResults();
+                      
+                      document.getElementById('video-status').textContent = 'Completed';
+                      document.getElementById('video-status').classList.add('success');
+                      
+                  } else if (data.status === 'error') {
+                      clearInterval(videoStatusInterval);
+                      showError('Error processing video: ' + data.error);
+                      statusBadge.textContent = 'Error';
+                      statusBadge.classList.remove('loading');
+                  }
+              } catch (error) {
+                  console.error('Status check error:', error);
+              }
+          }, 1000);
+      }
+
       function submitForm() {
           if (!fileInput.files?.length) {
-              errorMsg.classList.add('show');
+              showError('Please select a file first');
               return;
           }
 
@@ -442,12 +727,19 @@
           uploadZone.style.display = 'none';
           processing.style.display = 'flex';
           processingText.textContent = 'Analyzing image for potholes...';
+          statusBadge.textContent = 'Processing';
+          statusBadge.classList.add('loading');
 
           fetch('/upload', {
               method: 'POST',
               body: formData
           })
-          .then(response => response.text())
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error('Upload failed: ' + response.status);
+              }
+              return response.text();
+          })
           .then(html => {
               const parser = new DOMParser();
               const doc = parser.parseFromString(html, 'text/html');
@@ -459,11 +751,15 @@
               if (errorDisplay) {
                   // Show error
                   const errorText = errorDisplay.textContent;
-                  uploadZone.style.display = 'flex';
-                  processing.style.display = 'none';
-                  errorMsg.textContent = errorText;
-                  errorMsg.classList.add('show');
+                  showError(errorText);
+                  statusBadge.textContent = 'Error';
+                  statusBadge.classList.remove('loading');
               } else if (imageResultsSection) {
+                  // Success - show results
+                  statusBadge.textContent = 'Complete';
+                  statusBadge.classList.remove('loading');
+                  statusBadge.classList.add('success');
+
                   // Hide upload view
                   uploadView.style.display = 'none';
 
@@ -479,10 +775,9 @@
           })
           .catch(err => {
               console.error('Error:', err);
-              uploadZone.style.display = 'flex';
-              processing.style.display = 'none';
-              errorMsg.textContent = 'Error processing file. Please try again.';
-              errorMsg.classList.add('show');
+              showError('Error processing file. Please try again.');
+              statusBadge.textContent = 'Error';
+              statusBadge.classList.remove('loading');
           });
       }
 
@@ -508,6 +803,8 @@
           liveLoading.innerHTML = '<div class="spinner"></div><p>Starting live video stream...</p>';
           liveLoading.style.display = 'block';
           liveStreamImg.style.display = 'none';
+          statusBadge.textContent = 'Loading';
+          statusBadge.classList.add('loading');
 
           fetch('/start_live_video', {
               method: 'POST',
@@ -520,26 +817,35 @@
                   isLiveStreamActive = true;
 
                   // Start the video stream
-                  const streamUrl = `/video_feed/${liveVideoFilename}`;
+                  const streamUrl = `/video_feed/${encodeURIComponent(liveVideoFilename)}`;
                   liveStreamImg.src = streamUrl;
                   liveStreamImg.style.display = 'block';
                   liveLoading.style.display = 'none';
                   stopLiveBtn.style.display = 'block';
                   liveStatus.textContent = 'Streaming & Detecting';
                   liveStatus.classList.add('success');
+                  statusBadge.textContent = 'Live';
+                  statusBadge.classList.remove('loading');
+                  statusBadge.classList.add('success');
 
                   // Handle stream errors
                   liveStreamImg.onerror = function() {
                       liveStatus.textContent = 'Error loading stream';
                       liveStatus.classList.remove('success');
+                      statusBadge.textContent = 'Error';
+                      statusBadge.classList.remove('loading');
                   };
               } else {
-                  liveLoading.innerHTML = `<div class="error-stream">${data.error || 'Error starting video'}</div>`;
+                  liveLoading.innerHTML = `<div class="error-stream">${data.message || 'Error starting video'}</div>`;
+                  statusBadge.textContent = 'Error';
+                  statusBadge.classList.remove('loading');
               }
           })
           .catch(err => {
               console.error('Error:', err);
               liveLoading.innerHTML = `<div class="error-stream">Error starting live video. Please try again.</div>`;
+              statusBadge.textContent = 'Error';
+              statusBadge.classList.remove('loading');
           });
       }
 
@@ -558,6 +864,9 @@
               stopLiveBtn.style.display = 'none';
               liveStatus.textContent = 'Stopped';
               liveStatus.classList.remove('success');
+              statusBadge.textContent = 'Ready';
+              statusBadge.classList.remove('loading');
+              statusBadge.classList.remove('success');
           })
           .catch(err => {
               console.error('Error stopping video:', err);

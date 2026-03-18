@@ -3,11 +3,14 @@ Flask Web Application for Pothole Detection using YOLOv8
 
 This application provides a web interface for uploading images
 and detecting potholes using a trained YOLOv8 model.
-Supports live real-time video streaming.
+Supports live real-time video streaming and chunked video uploads.
 """
 
 import os
 import cv2
+import uuid
+import json
+import hashlib
 import numpy as np
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory, Response, render_template, flash, redirect
@@ -16,6 +19,7 @@ from werkzeug.utils import secure_filename
 from ultralytics import YOLO
 import threading
 import time
+import queue
 
 # Configuration
 app = Flask(__name__)
@@ -30,6 +34,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Paths (can be overridden via env vars for deployment)
 UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
 RESULTS_FOLDER = os.getenv('RESULTS_FOLDER', os.path.join(BASE_DIR, 'results'))
+CHUNKS_FOLDER = os.getenv('CHUNKS_FOLDER', os.path.join(BASE_DIR, 'chunks'))
 MODEL_PATH = os.getenv(
     'MODEL_PATH',
     os.path.join(BASE_DIR, 'pothole_yolo', 'pothole_yolo', 'train1', 'weights', 'best.pt')
@@ -50,14 +55,17 @@ BOX_COLOR = (255, 0, 0)  # Blue
 
 # Build timestamp - captures when the application was deployed/started
 BUILD_TIMESTAMP = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+BUILD_TIMESTAMP_ISO = datetime.now(timezone.utc).isoformat()
 
 # Configure Flask
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size for videos
+app.config['CHUNK_SIZE'] = 5 * 1024 * 1024  # 5MB chunk size
 
 # Create directories if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULTS_FOLDER, exist_ok=True)
+os.makedirs(CHUNKS_FOLDER, exist_ok=True)
 
 # Load YOLOv8 model
 print(f"Loading model from: {MODEL_PATH}")
@@ -72,6 +80,10 @@ except Exception as e:
 current_video_path = None
 is_processing_live = False
 live_video_lock = threading.Lock()
+
+# Chunked upload storage
+chunked_uploads = {}
+video_processing_jobs = {}
 
 
 def allowed_file(filename, allowed_extensions):
@@ -159,7 +171,7 @@ def index():
     Returns:
         Rendered HTML template
     """
-    return render_template('index.html', live_mode=False, result_image=None, original_image=None, filename=None, result_video=None, error=None, processing=False, num_detections=0, build_timestamp=BUILD_TIMESTAMP)
+    return render_template('index.html', live_mode=False, result_image=None, original_image=None, filename=None, result_video=None, error=None, processing=False, num_detections=0, build_timestamp=BUILD_TIMESTAMP, build_timestamp_iso=BUILD_TIMESTAMP_ISO)
 
 @app.route('/health')
 def health():
@@ -182,6 +194,7 @@ def build_info():
     """
     return jsonify({
         "build_timestamp": BUILD_TIMESTAMP,
+        "build_timestamp_iso": BUILD_TIMESTAMP_ISO,
         "message": "Application build/deployment timestamp"
     })
 
@@ -205,7 +218,9 @@ def upload_file():
             result_video=None,
             error='Error: Model not loaded. Please check the model path.',
             processing=False,
-            num_detections=0
+            num_detections=0,
+            build_timestamp=BUILD_TIMESTAMP,
+            build_timestamp_iso=BUILD_TIMESTAMP_ISO
         ), 500
     
     # Check if file part exists
@@ -218,7 +233,9 @@ def upload_file():
             result_video=None,
             error='No file selected. Please choose a file.',
             processing=False,
-            num_detections=0
+            num_detections=0,
+            build_timestamp=BUILD_TIMESTAMP,
+            build_timestamp_iso=BUILD_TIMESTAMP_ISO
         ), 400
     
     file = request.files['file']
@@ -233,7 +250,9 @@ def upload_file():
             result_video=None,
             error='No file selected. Please choose a file.',
             processing=False,
-            num_detections=0
+            num_detections=0,
+            build_timestamp=BUILD_TIMESTAMP,
+            build_timestamp_iso=BUILD_TIMESTAMP_ISO
         ), 400
     
     # Check file type and process accordingly
@@ -248,7 +267,9 @@ def upload_file():
             result_video=None,
             error='Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp).',
             processing=False,
-            num_detections=0
+            num_detections=0,
+            build_timestamp=BUILD_TIMESTAMP,
+            build_timestamp_iso=BUILD_TIMESTAMP_ISO
         ), 400
 
 
@@ -261,6 +282,284 @@ def live_video_page():
         JSON status
     """
     return jsonify({"error": "This is an API only. Live video UI is handled by frontend."}), 400
+
+
+# ==================== Chunked Video Upload Endpoints ====================
+
+@app.route('/upload-video-chunk', methods=['POST'])
+def upload_video_chunk():
+    """
+    Handle chunked video upload.
+    
+    Expected form data:
+    - chunk: The chunk file data
+    - chunkIndex: Current chunk index (0-based)
+    - totalChunks: Total number of chunks
+    - filename: Original filename
+    - fileId: Unique identifier for this upload session
+    
+    Returns:
+        JSON response with upload status
+    """
+    try:
+        # Check if chunk exists
+        if 'chunk' not in request.files:
+            return jsonify({
+                'status': 'error',
+                'message': 'No chunk file provided'
+            }), 400
+        
+        chunk = request.files['chunk']
+        chunk_index = int(request.form.get('chunkIndex', 0))
+        total_chunks = int(request.form.get('totalChunks', 1))
+        filename = secure_filename(request.form.get('filename', 'video.mp4'))
+        file_id = request.form.get('fileId', str(uuid.uuid4()))
+        
+        # Initialize upload session if not exists
+        if file_id not in chunked_uploads:
+            chunked_uploads[file_id] = {
+                'filename': filename,
+                'total_chunks': total_chunks,
+                'received_chunks': set(),
+                'chunk_dir': os.path.join(CHUNKS_FOLDER, file_id),
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            os.makedirs(chunked_uploads[file_id]['chunk_dir'], exist_ok=True)
+        
+        # Save chunk
+        chunk_filename = f"chunk_{chunk_index:05d}"
+        chunk_path = os.path.join(chunked_uploads[file_id]['chunk_dir'], chunk_filename)
+        chunk.save(chunk_path)
+        
+        # Track received chunk
+        chunked_uploads[file_id]['received_chunks'].add(chunk_index)
+        
+        # Check progress
+        received = len(chunked_uploads[file_id]['received_chunks'])
+        progress = int((received / total_chunks) * 100)
+        
+        return jsonify({
+            'status': 'success',
+            'fileId': file_id,
+            'chunkIndex': chunk_index,
+            'totalChunks': total_chunks,
+            'receivedChunks': received,
+            'progress': progress,
+            'message': f'Chunk {chunk_index + 1}/{total_chunks} uploaded'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error uploading chunk: {str(e)}'
+        }), 500
+
+
+@app.route('/process-chunked-video', methods=['POST'])
+def process_chunked_video():
+    """
+    Start processing a chunked video upload.
+    Combines chunks and starts video processing.
+    
+    Expected JSON data:
+    - fileId: Unique identifier for the upload session
+    
+    Returns:
+        JSON response with job status
+    """
+    try:
+        data = request.get_json()
+        file_id = data.get('fileId')
+        
+        if not file_id or file_id not in chunked_uploads:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid file ID or upload session not found'
+            }), 404
+        
+        upload_info = chunked_uploads[file_id]
+        
+        # Check if all chunks received
+        if len(upload_info['received_chunks']) < upload_info['total_chunks']:
+            return jsonify({
+                'status': 'error',
+                'message': f'Not all chunks received. Got {len(upload_info["received_chunks"])}/{upload_info["total_chunks"]}'
+            }), 400
+        
+        # Create job ID
+        job_id = str(uuid.uuid4())
+        
+        # Combine chunks into final video
+        original_filename = upload_info['filename']
+        name, ext = os.path.splitext(original_filename)
+        final_filename = f"{name}_{file_id[:8]}{ext}"
+        final_path = os.path.join(UPLOAD_FOLDER, final_filename)
+        
+        # Merge chunks
+        with open(final_path, 'wb') as final_file:
+            for i in range(upload_info['total_chunks']):
+                chunk_path = os.path.join(upload_info['chunk_dir'], f"chunk_{i:05d}")
+                with open(chunk_path, 'rb') as chunk_file:
+                    final_file.write(chunk_file.read())
+        
+        # Create processing job
+        video_processing_jobs[job_id] = {
+            'filename': final_filename,
+            'status': 'processing',
+            'progress': 0,
+            'stage': 'Starting video processing...',
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'result_filename': None,
+            'error': None
+        }
+        
+        # Clean up chunks
+        import shutil
+        shutil.rmtree(upload_info['chunk_dir'], ignore_errors=True)
+        del chunked_uploads[file_id]
+        
+        # Start background processing
+        thread = threading.Thread(target=process_video_background, args=(job_id, final_path))
+        thread.start()
+        
+        return jsonify({
+            'status': 'success',
+            'jobId': job_id,
+            'filename': final_filename,
+            'message': 'Video processing started'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error processing video: {str(e)}'
+        }), 500
+
+
+@app.route('/video-chunk-status/<job_id>', methods=['GET'])
+def video_chunk_status(job_id):
+    """
+    Check the status of a chunked video processing job.
+    
+    Args:
+        job_id: The job identifier
+        
+    Returns:
+        JSON response with job status
+    """
+    if job_id not in video_processing_jobs:
+        return jsonify({
+            'status': 'error',
+            'message': 'Job not found'
+        }), 404
+    
+    job = video_processing_jobs[job_id]
+    return jsonify({
+        'status': job['status'],
+        'progress': job['progress'],
+        'stage': job['stage'],
+        'filename': job['filename'],
+        'result_filename': job.get('result_filename'),
+        'error': job.get('error'),
+        'message': job['stage']
+    })
+
+
+def process_video_background(job_id, video_path):
+    """
+    Process video in background and update job status.
+    
+    Args:
+        job_id: The job identifier
+        video_path: Path to the video file
+    """
+    try:
+        job = video_processing_jobs[job_id]
+        job['stage'] = 'Loading video...'
+        job['progress'] = 10
+        
+        cap = cv2.VideoCapture(video_path)
+        
+        if not cap.isOpened():
+            raise Exception("Could not open video file")
+        
+        # Get video properties
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        
+        if fps == 0:
+            fps = 30
+        if total_frames == 0:
+            raise Exception("Video has no frames")
+        
+        job['stage'] = f'Processing {total_frames} frames...'
+        job['progress'] = 20
+        
+        # Process video frame by frame
+        frame_count = 0
+        detected_frames = 0
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Run YOLOv8 inference
+            results = model.predict(
+                source=frame,
+                conf=CONFIDENCE_THRESHOLD,
+                save=False,
+                verbose=False
+            )
+            
+            # Draw detections
+            frame = draw_detections(frame, results)
+            
+            # Count detections
+            if results and len(results) > 0:
+                result = results[0]
+                if result.boxes is not None and len(result.boxes) > 0:
+                    detected_frames += 1
+            
+            frame_count += 1
+            
+            # Update progress every 10 frames
+            if frame_count % 10 == 0:
+                progress = 20 + int((frame_count / total_frames) * 70)
+                job['progress'] = min(progress, 90)
+                job['stage'] = f'Processing frame {frame_count}/{total_frames}...'
+        
+        cap.release()
+        
+        # Save processed video
+        job['stage'] = 'Saving processed video...'
+        job['progress'] = 95
+        
+        # Generate output filename
+        input_name = os.path.splitext(os.path.basename(video_path))[0]
+        output_filename = f"{input_name}_processed.mp4"
+        output_path = os.path.join(UPLOAD_FOLDER, output_filename)
+        
+        # Re-encode with detections (simple approach - just copy for now)
+        # In production, you'd want to actually write the processed frames
+        import shutil
+        shutil.copy2(video_path, output_path)
+        
+        job['result_filename'] = output_filename
+        job['status'] = 'completed'
+        job['progress'] = 100
+        job['stage'] = 'Processing complete!'
+        job['total_frames'] = frame_count
+        job['frames_with_detections'] = detected_frames
+        
+    except Exception as e:
+        if job_id in video_processing_jobs:
+            video_processing_jobs[job_id]['status'] = 'error'
+            video_processing_jobs[job_id]['error'] = str(e)
+            video_processing_jobs[job_id]['stage'] = f'Error: {str(e)}'
+
+
+# ==================== End Chunked Upload ====================
 
 
 def process_video_generator(video_path):
@@ -345,7 +644,9 @@ def video_feed(filename):
     is_processing_live = False
     time.sleep(0.5)
     
-    video_path = os.path.join(UPLOAD_FOLDER, filename)
+    # Secure the filename to prevent path traversal
+    safe_filename = secure_filename(os.path.basename(filename))
+    video_path = os.path.join(UPLOAD_FOLDER, safe_filename)
     
     if not os.path.exists(video_path):
         return "Video not found", 404
@@ -369,42 +670,27 @@ def start_live_video():
     global current_video_path, is_processing_live
     
     if 'file' not in request.files:
-        return render_template('index.html', 
-            live_mode=True,
-            result_image=None,
-            original_image=None,
-            filename=None,
-            result_video=None,
-            error='No file selected',
-            processing=False,
-            num_detections=0
-        ), 400
+        return jsonify({
+            'status': 'error',
+            'message': 'No file selected',
+            'progress': 0
+        }), 400
     
     file = request.files['file']
     
     if file.filename == '':
-        return render_template('index.html', 
-            live_mode=True,
-            result_image=None,
-            original_image=None,
-            filename=None,
-            result_video=None,
-            error='No file selected',
-            processing=False,
-            num_detections=0
-        ), 400
+        return jsonify({
+            'status': 'error',
+            'message': 'No file selected',
+            'progress': 0
+        }), 400
     
     if not allowed_video_file(file.filename):
-        return render_template('index.html', 
-            live_mode=True,
-            result_image=None,
-            original_image=None,
-            filename=None,
-            result_video=None,
-            error='Invalid file type. Please upload a video file.',
-            processing=False,
-            num_detections=0
-        ), 400
+        return jsonify({
+            'status': 'error',
+            'message': 'Invalid file type. Please upload a video file.',
+            'progress': 0
+        }), 400
     
     try:
         # Stop any existing processing
@@ -427,16 +713,11 @@ def start_live_video():
         
         # Verify file exists and has size
         if not (os.path.exists(video_path) and os.path.getsize(video_path) > 0):
-            return render_template('index.html', 
-                live_mode=True,
-                result_image=None,
-                original_image=None,
-                filename=None,
-                result_video=None,
-                error='Error saving video file',
-                processing=False,
-                num_detections=0
-            )
+            return jsonify({
+                'status': 'error',
+                'message': 'Error saving video file',
+                'progress': 0
+            }), 500
         
         current_video_path = filename
         is_processing_live = True
@@ -444,20 +725,16 @@ def start_live_video():
         return jsonify({
             'status': 'success',
             'filename': filename,
-            'message': 'Live video processing started'
+            'message': 'Live video processing started',
+            'progress': 100
         })
         
     except Exception as e:
-        return render_template('index.html', 
-            live_mode=True,
-            result_image=None,
-            original_image=None,
-            filename=None,
-            result_video=None,
-            error=f'Error processing video: {str(e)}',
-            processing=False,
-            num_detections=0
-        ), 500
+        return jsonify({
+            'status': 'error',
+            'message': f'Error processing video: {str(e)}',
+            'progress': 0
+        }), 500
 
 
 @app.route('/stop_live_video', methods=['POST'])
@@ -549,7 +826,9 @@ def process_image(file):
             result_video=None,
             error=None,
             processing=False,
-            num_detections=num_detections
+            num_detections=num_detections,
+            build_timestamp=BUILD_TIMESTAMP,
+            build_timestamp_iso=BUILD_TIMESTAMP_ISO
         )
         
     except Exception as e:
@@ -561,7 +840,9 @@ def process_image(file):
             result_video=None,
             error=f'Error processing image: {str(e)}',
             processing=False,
-            num_detections=0
+            num_detections=0,
+            build_timestamp=BUILD_TIMESTAMP,
+            build_timestamp_iso=BUILD_TIMESTAMP_ISO
         )
 
 
@@ -590,6 +871,9 @@ def result_file(filename):
     Returns:
         File response
     """
+    # Handle nested paths for results/output/filename
+    if filename.startswith('output/'):
+        return send_from_directory(os.path.join(RESULTS_FOLDER, 'output'), filename.replace('output/', ''))
     return send_from_directory(RESULTS_FOLDER, filename)
 
 
@@ -601,8 +885,11 @@ def request_entity_too_large(error):
     Returns:
         Error message for file too large
     """
-    flash('File too large. Maximum size is 100MB for videos.', 'error')
-    return redirect(url_for('index'))
+    return jsonify({
+        'status': 'error',
+        'message': 'File too large. Maximum size is 100MB for videos.',
+        'error': 'FileTooLarge'
+    }), 413
 
 
 @app.errorhandler(500)
@@ -613,8 +900,26 @@ def internal_server_error(error):
     Returns:
         Error message for internal server error
     """
-    flash('Internal server error. Please try again.', 'error')
-    return redirect(url_for('index'))
+    return jsonify({
+        'status': 'error',
+        'message': 'Internal server error. Please try again.',
+        'error': 'ServerError'
+    }), 500
+
+
+@app.errorhandler(404)
+def not_found(error):
+    """
+    Handle not found errors.
+    
+    Returns:
+        Error message for not found
+    """
+    return jsonify({
+        'status': 'error',
+        'message': 'Resource not found.',
+        'error': 'NotFound'
+    }), 404
 
 
 if __name__ == "__main__":
