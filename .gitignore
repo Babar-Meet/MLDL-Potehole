@@ -28,7 +28,8 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-*.manifest
+*.man
+ifest
 *.spec
 
 # Installer logs
