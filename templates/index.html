@@ -141,7 +141,9 @@
                       stroke="currentColor"
                       stroke-width="2"
                     >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <path
+                        d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
+                      ></path>
                       <circle cx="9" cy="7" r="4"></circle>
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
@@ -191,7 +193,11 @@
                 </label>
 
                 <!-- Progress Bar -->
-                <div id="upload-progress-container" class="progress-container" style="display: none">
+                <div
+                  id="upload-progress-container"
+                  class="progress-container"
+                  style="display: none"
+                >
                   <div class="progress-bar">
                     <div id="upload-progress" class="progress-fill"></div>
                   </div>
@@ -205,11 +211,94 @@
                 </div>
 
                 <!-- Video Processing Status -->
-                <div id="video-processing-status" class="processing-status" style="display: none">
+                <div
+                  id="video-processing-status"
+                  class="processing-status"
+                  style="display: none"
+                >
                   <div class="status-progress-bar">
-                    <div id="status-progress-fill" class="status-progress-fill"></div>
+                    <div
+                      id="status-progress-fill"
+                      class="status-progress-fill"
+                    ></div>
                   </div>
-                  <div class="status-text" id="status-text">Initializing...</div>
+                  <div class="status-text" id="status-text">
+                    Initializing...
+                  </div>
+                </div>
+
+                <!-- Progress Tracker (Amazon Delivery Style) -->
+                <div
+                  id="progress-tracker"
+                  class="progress-tracker"
+                  style="display: none"
+                >
+                  <div class="tracker-header">Processing Video</div>
+                  <div class="tracker-stages">
+                    <div class="tracker-stage" id="stage-upload">
+                      <div class="stage-icon">
+                        <span class="stage-circle">1</span>
+                      </div>
+                      <div class="stage-label">Upload</div>
+                      <div class="stage-status" id="stage-upload-status">
+                        Waiting...
+                      </div>
+                    </div>
+                    <div class="tracker-connector" id="connector-upload"></div>
+                    <div class="tracker-stage" id="stage-processing">
+                      <div class="stage-icon">
+                        <span class="stage-circle">2</span>
+                      </div>
+                      <div class="stage-label">Processing Frames</div>
+                      <div class="stage-status" id="stage-processing-status">
+                        Waiting...
+                      </div>
+                    </div>
+                    <div
+                      class="tracker-connector"
+                      id="connector-processing"
+                    ></div>
+                    <div class="tracker-stage" id="stage-analyzing">
+                      <div class="stage-icon">
+                        <span class="stage-circle">3</span>
+                      </div>
+                      <div class="stage-label">Analyzing</div>
+                      <div class="stage-status" id="stage-analyzing-status">
+                        Waiting...
+                      </div>
+                    </div>
+                    <div
+                      class="tracker-connector"
+                      id="connector-analyzing"
+                    ></div>
+                    <div class="tracker-stage" id="stage-complete">
+                      <div class="stage-icon">
+                        <span class="stage-circle">4</span>
+                      </div>
+                      <div class="stage-label">Complete</div>
+                      <div class="stage-status" id="stage-complete-status">
+                        Waiting...
+                      </div>
+                    </div>
+                  </div>
+                  <div class="tracker-progress">
+                    <div class="tracker-progress-bar">
+                      <div
+                        id="tracker-progress-fill"
+                        class="tracker-progress-fill"
+                      ></div>
+                    </div>
+                    <div
+                      class="tracker-progress-text"
+                      id="tracker-progress-text"
+                    >
+                      0%
+                    </div>
+                  </div>
+                  <div class="tracker-frame-info" id="tracker-frame-info">
+                    Processing frame <span id="current-frame">0</span> of
+                    <span id="total-frames">0</span>
+                  </div>
                 </div>
 
                 <div id="error-message" class="error-message">
@@ -285,10 +374,7 @@
           </div>
 
           <!-- Video Results -->
-          <div
-            id="video-results-view"
-            style="display: none;"
-          >
+          <div id="video-results-view" style="display: none">
             <section class="video-results">
               <div class="results-stats">
                 <div class="stat-box">
@@ -308,7 +394,10 @@
                 <div class="loading-stream" id="video-loading">
                   <div class="spinner"></div>
                   <p>Processing video for pothole detection...</p>
-                  <p style="font-size: 12px; margin-top: 10px" id="video-loading-text">
+                  <p
+                    style="font-size: 12px; margin-top: 10px"
+                    id="video-loading-text"
+                  >
                     This may take a few minutes depending on video length
                   </p>
                 </div>
@@ -426,9 +515,13 @@
 
       <!-- Footer -->
       <footer class="footer">
-        <span class="footer-text">Pothole Detection System • Powered by YOLOv8</span>
+        <span class="footer-text"
+          >Pothole Detection System • Powered by YOLOv8</span
+        >
         <span class="footer-separator">•</span>
-        <span id="deploy-timestamp" class="deploy-timestamp">Loading deployment time...</span>
+        <span id="deploy-timestamp" class="deploy-timestamp"
+          >Loading deployment time...</span
+        >
       </footer>
     </div>
 
@@ -445,30 +538,176 @@
       const BUILD_TIMESTAMP_ISO = {{ build_timestamp_iso|tojson }};
       const BUILD_TIMESTAMP = {{ build_timestamp|tojson }};
 
-      // Calculate and display deployment time
-      function updateDeployTimestamp() {
-        const deployTime = new Date(BUILD_TIMESTAMP_ISO);
-        const now = new Date();
-        const diffMs = now - deployTime;
-        
-        const diffSecs = Math.floor(diffMs / 1000);
-        const days = Math.floor(diffSecs / 86400);
-        const hours = Math.floor((diffSecs % 86400) / 3600);
-        const minutes = Math.floor((diffSecs % 3600) / 60);
-        const seconds = diffSecs % 60;
-        
-        const timeStr = 
-          (days > 0 ? days + 'd ' : '') +
-          hours + 'h ' +
-          minutes + 'm ' +
-          seconds + 's';
-        
-        document.getElementById('deploy-timestamp').textContent = 'Deployed: ' + timeStr + ' ago';
+      // Fetch build info and display static timestamp
+      async function fetchBuildInfo() {
+        try {
+          const response = await fetch('/build-info');
+          const data = await response.json();
+
+          if (data.build_timestamp_iso) {
+            const timestamp = new Date(data.build_timestamp_iso);
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const day = String(timestamp.getDate()).padStart(2, '0');
+            const month = months[timestamp.getMonth()];
+            const year = timestamp.getFullYear();
+            const hours = String(timestamp.getHours()).padStart(2, '0');
+            const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+            const seconds = String(timestamp.getSeconds()).padStart(2, '0');
+
+            const formattedTime = `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
+            document.getElementById('deploy-timestamp').textContent = 'Last updated on ' + formattedTime;
+          }
+        } catch (error) {
+          console.error('Error fetching build info:', error);
+          // Fallback to server-rendered timestamp
+          const timestamp = new Date(BUILD_TIMESTAMP_ISO);
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const day = String(timestamp.getDate()).padStart(2, '0');
+          const month = months[timestamp.getMonth()];
+          const year = timestamp.getFullYear();
+          const hours = String(timestamp.getHours()).padStart(2, '0');
+          const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+          const seconds = String(timestamp.getSeconds()).padStart(2, '0');
+          const formattedTime = `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
+          document.getElementById('deploy-timestamp').textContent = 'Last updated on ' + formattedTime;
+        }
       }
-      
-      // Update timestamp every second
-      updateDeployTimestamp();
-      setInterval(updateDeployTimestamp, 1000);
+
+      // Initialize static timestamp on page load
+      fetchBuildInfo();
+
+      // Progress tracker elements
+      const progressTracker = document.getElementById('progress-tracker');
+      const trackerProgressFill = document.getElementById('tracker-progress-fill');
+      const trackerProgressText = document.getElementById('tracker-progress-text');
+      const trackerFrameInfo = document.getElementById('tracker-frame-info');
+      const currentFrameEl = document.getElementById('current-frame');
+      const totalFramesEl = document.getElementById('total-frames');
+
+      // Stage elements
+      const stageUpload = document.getElementById('stage-upload');
+      const stageProcessing = document.getElementById('stage-processing');
+      const stageAnalyzing = document.getElementById('stage-analyzing');
+      const stageComplete = document.getElementById('stage-complete');
+      const connectorUpload = document.getElementById('connector-upload');
+      const connectorProcessing = document.getElementById('connector-processing');
+      const connectorAnalyzing = document.getElementById('connector-analyzing');
+
+      // Stage status elements
+      const stageUploadStatus = document.getElementById('stage-upload-status');
+      const stageProcessingStatus = document.getElementById('stage-processing-status');
+      const stageAnalyzingStatus = document.getElementById('stage-analyzing-status');
+      const stageCompleteStatus = document.getElementById('stage-complete-status');
+
+      // Reset progress tracker to initial state
+      function resetProgressTracker() {
+        progressTracker.style.display = 'none';
+
+        // Reset all stages
+        [stageUpload, stageProcessing, stageAnalyzing, stageComplete].forEach(stage => {
+          stage.classList.remove('active', 'completed');
+          const circle = stage.querySelector('.stage-circle');
+          circle.textContent = circle.textContent.replace('✓', '').replace('✓', '');
+        });
+
+        // Reset connectors
+        [connectorUpload, connectorProcessing, connectorAnalyzing].forEach(conn => {
+          conn.classList.remove('completed');
+        });
+
+        // Reset status text
+        stageUploadStatus.textContent = 'Waiting...';
+        stageProcessingStatus.textContent = 'Waiting...';
+        stageAnalyzingStatus.textContent = 'Waiting...';
+        stageCompleteStatus.textContent = 'Waiting...';
+
+        // Reset progress bar
+        trackerProgressFill.style.width = '0%';
+        trackerProgressText.textContent = '0%';
+
+        // Reset frame info
+        currentFrameEl.textContent = '0';
+        totalFramesEl.textContent = '0';
+      }
+
+      // Update progress tracker based on current stage
+      function updateProgressTracker(currentStage, progress, currentFrame, totalFrames) {
+        progressTracker.style.display = 'block';
+
+        // Update progress bar
+        trackerProgressFill.style.width = progress + '%';
+        trackerProgressText.textContent = progress + '%';
+
+        // Update frame info
+        if (totalFrames > 0) {
+          currentFrameEl.textContent = currentFrame;
+          totalFramesEl.textContent = totalFrames;
+          trackerFrameInfo.style.display = 'block';
+        }
+
+        // Reset all stages first
+        [stageUpload, stageProcessing, stageAnalyzing, stageComplete].forEach(stage => {
+          stage.classList.remove('active', 'completed');
+        });
+        [connectorUpload, connectorProcessing, connectorAnalyzing].forEach(conn => {
+          conn.classList.remove('completed');
+        });
+
+        // Update based on current stage
+        if (currentStage === 'upload' || progress < 20) {
+          // Upload stage - mark upload as active
+          stageUpload.classList.add('active');
+          stageUploadStatus.textContent = 'In Progress';
+
+        } else if (currentStage === 'processing' || (progress >= 20 && progress < 90)) {
+          // Processing frames stage
+          stageUpload.classList.add('completed');
+          stageUpload.querySelector('.stage-circle').textContent = '✓';
+          stageUploadStatus.textContent = 'Complete';
+          connectorUpload.classList.add('completed');
+
+          stageProcessing.classList.add('active');
+          stageProcessingStatus.textContent = 'Processing frames...';
+
+        } else if (currentStage === 'analyzing' || progress >= 90) {
+          // Analyzing stage
+          stageUpload.classList.add('completed');
+          stageUpload.querySelector('.stage-circle').textContent = '✓';
+          stageUploadStatus.textContent = 'Complete';
+          connectorUpload.classList.add('completed');
+
+          stageProcessing.classList.add('completed');
+          stageProcessing.querySelector('.stage-circle').textContent = '✓';
+          stageProcessingStatus.textContent = 'Complete';
+          connectorProcessing.classList.add('completed');
+
+          stageAnalyzing.classList.add('active');
+          stageAnalyzingStatus.textContent = 'Analyzing...';
+
+        } else if (currentStage === 'complete' || progress === 100) {
+          // Complete stage
+          stageUpload.classList.add('completed');
+          stageUpload.querySelector('.stage-circle').textContent = '✓';
+          stageUploadStatus.textContent = 'Complete';
+          connectorUpload.classList.add('completed');
+
+          stageProcessing.classList.add('completed');
+          stageProcessing.querySelector('.stage-circle').textContent = '✓';
+          stageProcessingStatus.textContent = 'Complete';
+          connectorProcessing.classList.add('completed');
+
+          stageAnalyzing.classList.add('completed');
+          stageAnalyzing.querySelector('.stage-circle').textContent = '✓';
+          stageAnalyzingStatus.textContent = 'Complete';
+          connectorAnalyzing.classList.add('completed');
+
+          stageComplete.classList.add('completed');
+          stageComplete.querySelector('.stage-circle').textContent = '✓';
+          stageCompleteStatus.textContent = 'Complete';
+
+          trackerFrameInfo.style.display = 'none';
+        }
+      }
 
       let currentUploadType = 'image';
       let liveVideoFilename = null;
@@ -606,10 +845,11 @@
       async function uploadVideoChunked(file) {
           const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
           fileId = file.name + '_' + Date.now();
-          
+
           // Show progress UI
           uploadZone.style.display = 'none';
           uploadProgressContainer.style.display = 'block';
+          progressTracker.style.display = 'none';
           statusBadge.textContent = 'Uploading';
           statusBadge.classList.add('loading');
 
@@ -618,7 +858,7 @@
                   const start = chunkIndex * CHUNK_SIZE;
                   const end = Math.min(start + CHUNK_SIZE, file.size);
                   const chunk = file.slice(start, end);
-                  
+
                   const formData = new FormData();
                   formData.append('chunk', chunk);
                   formData.append('chunkIndex', chunkIndex);
@@ -630,36 +870,40 @@
                       method: 'POST',
                       body: formData
                   });
-                  
+
                   const data = await response.json();
-                  
+
                   if (data.status !== 'success') {
                       throw new Error(data.message || 'Chunk upload failed');
                   }
-                  
+
                   // Update progress
                   const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
                   uploadProgress.style.width = progress + '%';
                   uploadProgressText.textContent = progress + '%';
+
+                  // Update progress tracker for upload stage
+                  updateProgressTracker('upload', progress, 0, 0);
               }
 
               // All chunks uploaded, start processing
               statusBadge.textContent = 'Processing';
               uploadProgressContainer.style.display = 'none';
               videoProcessingStatus.style.display = 'block';
-              
+              progressTracker.style.display = 'block';
+
               const processResponse = await fetch('/process-chunked-video', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ fileId: fileId })
               });
-              
+
               const processData = await processResponse.json();
-              
+
               if (processData.status !== 'success') {
                   throw new Error(processData.message || 'Processing failed');
               }
-              
+
               currentVideoJobId = processData.jobId;
               startVideoStatusPolling();
 
@@ -672,37 +916,48 @@
       }
 
       function startVideoStatusPolling() {
+          // Reset and show progress tracker
+          resetProgressTracker();
+          progressTracker.style.display = 'block';
+
           videoStatusInterval = setInterval(async () => {
               if (!currentVideoJobId) return;
-              
+
               try {
                   const response = await fetch('/video-chunk-status/' + currentVideoJobId);
                   const data = await response.json();
-                  
-                  // Update progress UI
+
+                  // Update legacy progress UI
                   statusProgressFill.style.width = data.progress + '%';
                   statusText.textContent = data.stage;
-                  
+
+                  // Update progress tracker with new fields
+                  const currentStage = data.current_stage || 'upload';
+                  const currentFrame = data.current_frame || 0;
+                  const totalFrames = data.total_frames || 0;
+
+                  updateProgressTracker(currentStage, data.progress, currentFrame, totalFrames);
+
                   if (data.status === 'completed') {
                       clearInterval(videoStatusInterval);
                       statusBadge.textContent = 'Complete';
                       statusBadge.classList.remove('loading');
                       statusBadge.classList.add('success');
-                      
+
                       // Show video player
                       const videoPlayer = document.getElementById('video-player');
                       const videoSource = document.getElementById('video-source');
                       const videoLoading = document.getElementById('video-loading');
-                      
+
                       videoSource.src = '/uploads/' + data.result_filename;
                       videoPlayer.style.display = 'block';
                       videoLoading.style.display = 'none';
-                      
+
                       showVideoResults();
-                      
+
                       document.getElementById('video-status').textContent = 'Completed';
                       document.getElementById('video-status').classList.add('success');
-                      
+
                   } else if (data.status === 'error') {
                       clearInterval(videoStatusInterval);
                       showError('Error processing video: ' + data.error);

@@ -454,10 +454,26 @@ def video_chunk_status(job_id):
         }), 404
     
     job = video_processing_jobs[job_id]
+    
+    # Determine current stage based on progress
+    current_stage = 'upload'
+    if job['progress'] > 0 and job['progress'] < 20:
+        current_stage = 'upload'
+    elif job['progress'] >= 20 and job['progress'] < 90:
+        current_stage = 'processing'
+    elif job['progress'] >= 90:
+        current_stage = 'analyzing'
+    
+    if job['status'] == 'completed':
+        current_stage = 'complete'
+    
     return jsonify({
         'status': job['status'],
         'progress': job['progress'],
         'stage': job['stage'],
+        'current_stage': current_stage,
+        'current_frame': job.get('current_frame', 0),
+        'total_frames': job.get('total_frames', 0),
         'filename': job['filename'],
         'result_filename': job.get('result_filename'),
         'error': job.get('error'),
@@ -477,6 +493,8 @@ def process_video_background(job_id, video_path):
         job = video_processing_jobs[job_id]
         job['stage'] = 'Loading video...'
         job['progress'] = 10
+        job['current_frame'] = 0
+        job['total_frames'] = 0
         
         cap = cv2.VideoCapture(video_path)
         
@@ -492,8 +510,10 @@ def process_video_background(job_id, video_path):
         if total_frames == 0:
             raise Exception("Video has no frames")
         
+        job['total_frames'] = total_frames
         job['stage'] = f'Processing {total_frames} frames...'
         job['progress'] = 20
+        job['current_stage'] = 'processing'
         
         # Process video frame by frame
         frame_count = 0
@@ -503,6 +523,9 @@ def process_video_background(job_id, video_path):
             ret, frame = cap.read()
             if not ret:
                 break
+            
+            # Update current frame
+            job['current_frame'] = frame_count + 1
             
             # Run YOLOv8 inference
             results = model.predict(
@@ -534,6 +557,7 @@ def process_video_background(job_id, video_path):
         # Save processed video
         job['stage'] = 'Saving processed video...'
         job['progress'] = 95
+        job['current_stage'] = 'analyzing'
         
         # Generate output filename
         input_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -551,6 +575,7 @@ def process_video_background(job_id, video_path):
         job['stage'] = 'Processing complete!'
         job['total_frames'] = frame_count
         job['frames_with_detections'] = detected_frames
+        job['current_stage'] = 'complete'
         
     except Exception as e:
         if job_id in video_processing_jobs:
