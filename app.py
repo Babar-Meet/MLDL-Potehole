@@ -9,7 +9,7 @@ Supports live real-time video streaming.
 import os
 import cv2
 import numpy as np
-from flask import Flask, request, jsonify, send_from_directory, Response, render_template
+from flask import Flask, request, jsonify, send_from_directory, Response, render_template, flash, redirect
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from ultralytics import YOLO
@@ -155,7 +155,7 @@ def index():
     Returns:
         Rendered HTML template
     """
-    return render_template('index.html', live_mode=False, result_image=None, result_video=None, error=None, processing=False, num_detections=0)
+    return render_template('index.html', live_mode=False, result_image=None, original_image=None, filename=None, result_video=None, error=None, processing=False, num_detections=0)
 
 @app.route('/health')
 def health():
@@ -504,5 +504,5 @@ def internal_server_error(error):
 if __name__ == "__main__":
     # Support PORT env var for local container runs
     port = int(os.getenv("PORT", 5000))
-    debug = os.getenv("FLASK_DEBUG", "true").lower() == "true"
+    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
     app.run(host="0.0.0.0", port=port, debug=debug)
