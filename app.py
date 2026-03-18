@@ -155,7 +155,7 @@ def index():
     Returns:
         Rendered HTML template
     """
-    return render_template('index.html')
+    return render_template('index.html', live_mode=False, result_image=None, result_video=None, error=None, processing=False, num_detections=0)
 
 @app.route('/health')
 def health():
