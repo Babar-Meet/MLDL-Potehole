@@ -179,23 +179,59 @@ def upload_file():
     """
     # Check if model is loaded
     if model is None:
-        return jsonify({'error': 'Error: Model not loaded. Please check the model path.'}), 500
+        return render_template('index.html', 
+            live_mode=False,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error='Error: Model not loaded. Please check the model path.',
+            processing=False,
+            num_detections=0
+        ), 500
     
     # Check if file part exists
     if 'file' not in request.files:
-        return jsonify({'error': 'No file selected. Please choose a file.'}), 400
+        return render_template('index.html', 
+            live_mode=False,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error='No file selected. Please choose a file.',
+            processing=False,
+            num_detections=0
+        ), 400
     
     file = request.files['file']
     
     # Check if file was selected
     if file.filename == '':
-        return jsonify({'error': 'No file selected. Please choose a file.'}), 400
+        return render_template('index.html', 
+            live_mode=False,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error='No file selected. Please choose a file.',
+            processing=False,
+            num_detections=0
+        ), 400
     
     # Check file type and process accordingly
     if allowed_image_file(file.filename):
         return process_image(file)
     else:
-        return jsonify({'error': 'Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp).'}), 400
+        return render_template('index.html', 
+            live_mode=False,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error='Invalid file type. Please upload an image (jpg, jpeg, png, gif, bmp, webp).',
+            processing=False,
+            num_detections=0
+        ), 400
 
 
 @app.route('/live-video')
@@ -315,15 +351,42 @@ def start_live_video():
     global current_video_path, is_processing_live
     
     if 'file' not in request.files:
-        return jsonify({'error': 'No file selected'}), 400
+        return render_template('index.html', 
+            live_mode=True,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error='No file selected',
+            processing=False,
+            num_detections=0
+        ), 400
     
     file = request.files['file']
     
     if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
+        return render_template('index.html', 
+            live_mode=True,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error='No file selected',
+            processing=False,
+            num_detections=0
+        ), 400
     
     if not allowed_video_file(file.filename):
-        return jsonify({'error': 'Invalid file type. Please upload a video file.'}), 400
+        return render_template('index.html', 
+            live_mode=True,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error='Invalid file type. Please upload a video file.',
+            processing=False,
+            num_detections=0
+        ), 400
     
     try:
         # Stop any existing processing
@@ -341,6 +404,21 @@ def start_live_video():
         
         video_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(video_path)
+        file.flush()
+        os.fsync(file.fileno())  # Force write to disk
+        
+        # Verify file exists and has size
+        if not (os.path.exists(video_path) and os.path.getsize(video_path) > 0):
+            return render_template('index.html', 
+                live_mode=True,
+                result_image=None,
+                original_image=None,
+                filename=None,
+                result_video=None,
+                error='Error saving video file',
+                processing=False,
+                num_detections=0
+            )
         
         current_video_path = filename
         is_processing_live = True
@@ -352,7 +430,16 @@ def start_live_video():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return render_template('index.html', 
+            live_mode=True,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error=f'Error processing video: {str(e)}',
+            processing=False,
+            num_detections=0
+        ), 500
 
 
 @app.route('/stop_live_video', methods=['POST'])
@@ -436,17 +523,28 @@ def process_image(file):
             if result.boxes is not None:
                 num_detections = len(result.boxes)
         
-        return jsonify({
-            'status': 'success',
-            'original_image': original_url,
-            'result_image': result_url,
-            'num_detections': num_detections,
-            'filename': filename,
-            'is_video': False
-        })
+        return render_template('index.html', 
+            live_mode=False,
+            result_image=result_url,
+            original_image=original_url,
+            filename=filename,
+            result_video=None,
+            error=None,
+            processing=False,
+            num_detections=num_detections
+        )
         
     except Exception as e:
-        return jsonify({'error': f'Error processing image: {str(e)}'}), 500
+        return render_template('index.html', 
+            live_mode=False,
+            result_image=None,
+            original_image=None,
+            filename=None,
+            result_video=None,
+            error=f'Error processing image: {str(e)}',
+            processing=False,
+            num_detections=0
+        )
 
 
 @app.route('/uploads/<path:filename>')
