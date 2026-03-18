@@ -9,7 +9,7 @@ Supports live real-time video streaming.
 import os
 import cv2
 import numpy as np
-from flask import Flask, request, jsonify, send_from_directory, Response
+from flask import Flask, request, jsonify, send_from_directory, Response, render_template
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from ultralytics import YOLO
@@ -150,12 +150,12 @@ def draw_detections(frame, results):
 @app.route('/')
 def index():
     """
-    Root endpoint to verify API is running.
+    Render the main page.
     
     Returns:
-        JSON status message
+        Rendered HTML template
     """
-    return jsonify({"status": "healthy", "service": "Pothole Detection API"})
+    return render_template('index.html')
 
 @app.route('/health')
 def health():
