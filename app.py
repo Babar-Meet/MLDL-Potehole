@@ -460,7 +460,7 @@ def uploaded_file(filename):
     Returns:
         File response
     """
-    return send_from_directory(BASE_DIR, filename)
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 
 @app.route('/results/<path:filename>')
