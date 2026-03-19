@@ -115,23 +115,6 @@
                   <button
                     type="button"
                     class="upload-type-btn"
-                    id="video-btn"
-                    onclick="setUploadType('video')"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polygon points="10 8 16 12 10 16 10 8"></polygon>
-                    </svg>
-                    Video
-                  </button>
-                  <button
-                    type="button"
-                    class="upload-type-btn"
                     id="live-btn"
                     onclick="setUploadType('live')"
                   >
@@ -208,97 +191,6 @@
                 <div id="processing" class="processing" style="display: none">
                   <div class="spinner"></div>
                   <span id="processing-text">Analyzing for potholes...</span>
-                </div>
-
-                <!-- Video Processing Status -->
-                <div
-                  id="video-processing-status"
-                  class="processing-status"
-                  style="display: none"
-                >
-                  <div class="status-progress-bar">
-                    <div
-                      id="status-progress-fill"
-                      class="status-progress-fill"
-                    ></div>
-                  </div>
-                  <div class="status-text" id="status-text">
-                    Initializing...
-                  </div>
-                </div>
-
-                <!-- Progress Tracker (Amazon Delivery Style) -->
-                <div
-                  id="progress-tracker"
-                  class="progress-tracker"
-                  style="display: none"
-                >
-                  <div class="tracker-header">Processing Video</div>
-                  <div class="tracker-stages">
-                    <div class="tracker-stage" id="stage-upload">
-                      <div class="stage-icon">
-                        <span class="stage-circle">1</span>
-                      </div>
-                      <div class="stage-label">Upload</div>
-                      <div class="stage-status" id="stage-upload-status">
-                        Waiting...
-                      </div>
-                    </div>
-                    <div class="tracker-connector" id="connector-upload"></div>
-                    <div class="tracker-stage" id="stage-processing">
-                      <div class="stage-icon">
-                        <span class="stage-circle">2</span>
-                      </div>
-                      <div class="stage-label">Processing Frames</div>
-                      <div class="stage-status" id="stage-processing-status">
-                        Waiting...
-                      </div>
-                    </div>
-                    <div
-                      class="tracker-connector"
-                      id="connector-processing"
-                    ></div>
-                    <div class="tracker-stage" id="stage-analyzing">
-                      <div class="stage-icon">
-                        <span class="stage-circle">3</span>
-                      </div>
-                      <div class="stage-label">Analyzing</div>
-                      <div class="stage-status" id="stage-analyzing-status">
-                        Waiting...
-                      </div>
-                    </div>
-                    <div
-                      class="tracker-connector"
-                      id="connector-analyzing"
-                    ></div>
-                    <div class="tracker-stage" id="stage-complete">
-                      <div class="stage-icon">
-                        <span class="stage-circle">4</span>
-                      </div>
-                      <div class="stage-label">Complete</div>
-                      <div class="stage-status" id="stage-complete-status">
-                        Waiting...
-                      </div>
-                    </div>
-                  </div>
-                  <div class="tracker-progress">
-                    <div class="tracker-progress-bar">
-                      <div
-                        id="tracker-progress-fill"
-                        class="tracker-progress-fill"
-                      ></div>
-                    </div>
-                    <div
-                      class="tracker-progress-text"
-                      id="tracker-progress-text"
-                    >
-                      0%
-                    </div>
-                  </div>
-                  <div class="tracker-frame-info" id="tracker-frame-info">
-                    Processing frame <span id="current-frame">0</span> of
-                    <span id="total-frames">0</span>
-                  </div>
                 </div>
 
                 <div id="error-message" class="error-message">
@@ -506,7 +398,7 @@
               <div class="info-value">16 MB</div>
             </div>
             <div class="info-card">
-              <div class="info-label">Video Upload</div>
+              <div class="info-label">Live Video</div>
               <div class="info-value">Supported</div>
             </div>
           </div>
@@ -576,144 +468,9 @@
       // Initialize static timestamp on page load
       fetchBuildInfo();
 
-      // Progress tracker elements
-      const progressTracker = document.getElementById('progress-tracker');
-      const trackerProgressFill = document.getElementById('tracker-progress-fill');
-      const trackerProgressText = document.getElementById('tracker-progress-text');
-      const trackerFrameInfo = document.getElementById('tracker-frame-info');
-      const currentFrameEl = document.getElementById('current-frame');
-      const totalFramesEl = document.getElementById('total-frames');
-
-      // Stage elements
-      const stageUpload = document.getElementById('stage-upload');
-      const stageProcessing = document.getElementById('stage-processing');
-      const stageAnalyzing = document.getElementById('stage-analyzing');
-      const stageComplete = document.getElementById('stage-complete');
-      const connectorUpload = document.getElementById('connector-upload');
-      const connectorProcessing = document.getElementById('connector-processing');
-      const connectorAnalyzing = document.getElementById('connector-analyzing');
-
-      // Stage status elements
-      const stageUploadStatus = document.getElementById('stage-upload-status');
-      const stageProcessingStatus = document.getElementById('stage-processing-status');
-      const stageAnalyzingStatus = document.getElementById('stage-analyzing-status');
-      const stageCompleteStatus = document.getElementById('stage-complete-status');
-
-      // Reset progress tracker to initial state
-      function resetProgressTracker() {
-        progressTracker.style.display = 'none';
-
-        // Reset all stages
-        [stageUpload, stageProcessing, stageAnalyzing, stageComplete].forEach(stage => {
-          stage.classList.remove('active', 'completed');
-          const circle = stage.querySelector('.stage-circle');
-          circle.textContent = circle.textContent.replace('✓', '').replace('✓', '');
-        });
-
-        // Reset connectors
-        [connectorUpload, connectorProcessing, connectorAnalyzing].forEach(conn => {
-          conn.classList.remove('completed');
-        });
-
-        // Reset status text
-        stageUploadStatus.textContent = 'Waiting...';
-        stageProcessingStatus.textContent = 'Waiting...';
-        stageAnalyzingStatus.textContent = 'Waiting...';
-        stageCompleteStatus.textContent = 'Waiting...';
-
-        // Reset progress bar
-        trackerProgressFill.style.width = '0%';
-        trackerProgressText.textContent = '0%';
-
-        // Reset frame info
-        currentFrameEl.textContent = '0';
-        totalFramesEl.textContent = '0';
-      }
-
-      // Update progress tracker based on current stage
-      function updateProgressTracker(currentStage, progress, currentFrame, totalFrames) {
-        progressTracker.style.display = 'block';
-
-        // Update progress bar
-        trackerProgressFill.style.width = progress + '%';
-        trackerProgressText.textContent = progress + '%';
-
-        // Update frame info
-        if (totalFrames > 0) {
-          currentFrameEl.textContent = currentFrame;
-          totalFramesEl.textContent = totalFrames;
-          trackerFrameInfo.style.display = 'block';
-        }
-
-        // Reset all stages first
-        [stageUpload, stageProcessing, stageAnalyzing, stageComplete].forEach(stage => {
-          stage.classList.remove('active', 'completed');
-        });
-        [connectorUpload, connectorProcessing, connectorAnalyzing].forEach(conn => {
-          conn.classList.remove('completed');
-        });
-
-        // Update based on current stage
-        if (currentStage === 'upload' || progress < 20) {
-          // Upload stage - mark upload as active
-          stageUpload.classList.add('active');
-          stageUploadStatus.textContent = 'In Progress';
-
-        } else if (currentStage === 'processing' || (progress >= 20 && progress < 90)) {
-          // Processing frames stage
-          stageUpload.classList.add('completed');
-          stageUpload.querySelector('.stage-circle').textContent = '✓';
-          stageUploadStatus.textContent = 'Complete';
-          connectorUpload.classList.add('completed');
-
-          stageProcessing.classList.add('active');
-          stageProcessingStatus.textContent = 'Processing frames...';
-
-        } else if (currentStage === 'analyzing' || progress >= 90) {
-          // Analyzing stage
-          stageUpload.classList.add('completed');
-          stageUpload.querySelector('.stage-circle').textContent = '✓';
-          stageUploadStatus.textContent = 'Complete';
-          connectorUpload.classList.add('completed');
-
-          stageProcessing.classList.add('completed');
-          stageProcessing.querySelector('.stage-circle').textContent = '✓';
-          stageProcessingStatus.textContent = 'Complete';
-          connectorProcessing.classList.add('completed');
-
-          stageAnalyzing.classList.add('active');
-          stageAnalyzingStatus.textContent = 'Analyzing...';
-
-        } else if (currentStage === 'complete' || progress === 100) {
-          // Complete stage
-          stageUpload.classList.add('completed');
-          stageUpload.querySelector('.stage-circle').textContent = '✓';
-          stageUploadStatus.textContent = 'Complete';
-          connectorUpload.classList.add('completed');
-
-          stageProcessing.classList.add('completed');
-          stageProcessing.querySelector('.stage-circle').textContent = '✓';
-          stageProcessingStatus.textContent = 'Complete';
-          connectorProcessing.classList.add('completed');
-
-          stageAnalyzing.classList.add('completed');
-          stageAnalyzing.querySelector('.stage-circle').textContent = '✓';
-          stageAnalyzingStatus.textContent = 'Complete';
-          connectorAnalyzing.classList.add('completed');
-
-          stageComplete.classList.add('completed');
-          stageComplete.querySelector('.stage-circle').textContent = '✓';
-          stageCompleteStatus.textContent = 'Complete';
-
-          trackerFrameInfo.style.display = 'none';
-        }
-      }
-
       let currentUploadType = 'image';
       let liveVideoFilename = null;
       let isLiveStreamActive = false;
-      let currentVideoJobId = null;
-      let videoStatusInterval = null;
 
       const fileInput = document.getElementById('file');
       const uploadZone = document.getElementById('upload-zone');
@@ -728,7 +485,6 @@
       const processing = document.getElementById('processing');
       const uploadTypeInput = document.getElementById('upload-type');
       const imageBtn = document.getElementById('image-btn');
-      const videoBtn = document.getElementById('video-btn');
       const liveBtn = document.getElementById('live-btn');
       const uploadText = document.getElementById('upload-text');
       const uploadHint = document.getElementById('upload-hint');
@@ -738,11 +494,6 @@
 
       // Progress elements
       const uploadProgressContainer = document.getElementById('upload-progress-container');
-      const uploadProgress = document.getElementById('upload-progress');
-      const uploadProgressText = document.getElementById('upload-progress-text');
-      const videoProcessingStatus = document.getElementById('video-processing-status');
-      const statusProgressFill = document.getElementById('status-progress-fill');
-      const statusText = document.getElementById('status-text');
 
       // Check if we're in live mode on page load
       const urlParams = new URLSearchParams(window.location.search);
@@ -758,10 +509,8 @@
 
           // Reset UI
           imageBtn.classList.remove('active');
-          videoBtn.classList.remove('active');
           liveBtn.classList.remove('active');
           uploadProgressContainer.style.display = 'none';
-          videoProcessingStatus.style.display = 'none';
           processing.style.display = 'none';
 
           if (type === 'image') {
@@ -770,13 +519,6 @@
               uploadText.textContent = 'Drag & Drop or Click to Upload Image';
               uploadHint.textContent = 'Best results with clear road/street photos';
               uploadFormats.textContent = 'JPG, PNG, GIF, BMP, WebP  •  max 16 MB';
-              uploadZone.style.display = 'flex';
-          } else if (type === 'video') {
-              videoBtn.classList.add('active');
-              fileInput.accept = 'video/*';
-              uploadText.textContent = 'Drag & Drop or Click to Upload Video';
-              uploadHint.textContent = 'Upload video for batch pothole detection';
-              uploadFormats.textContent = 'MP4, AVI, MOV, MKV  •  max 100 MB';
               uploadZone.style.display = 'flex';
           } else if (type === 'live') {
               liveBtn.classList.add('active');
@@ -811,7 +553,6 @@
           uploadZone.style.display = 'flex';
           processing.style.display = 'none';
           uploadProgressContainer.style.display = 'none';
-          videoProcessingStatus.style.display = 'none';
       }
 
       function hideError() {
@@ -828,146 +569,11 @@
               // Auto-submit for images
               if (currentUploadType === 'image') {
                   submitForm();
-              } else if (currentUploadType === 'video') {
-                  // Start chunked upload for videos
-                  uploadVideoChunked(file);
               }
           } else {
               fileSelected.classList.remove('show');
               uploadZone.classList.remove('has-file');
           }
-      }
-
-      // Chunked video upload
-      const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-      let fileId = null;
-
-      async function uploadVideoChunked(file) {
-          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-          fileId = file.name + '_' + Date.now();
-
-          // Show progress UI
-          uploadZone.style.display = 'none';
-          uploadProgressContainer.style.display = 'block';
-          progressTracker.style.display = 'none';
-          statusBadge.textContent = 'Uploading';
-          statusBadge.classList.add('loading');
-
-          try {
-              for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                  const start = chunkIndex * CHUNK_SIZE;
-                  const end = Math.min(start + CHUNK_SIZE, file.size);
-                  const chunk = file.slice(start, end);
-
-                  const formData = new FormData();
-                  formData.append('chunk', chunk);
-                  formData.append('chunkIndex', chunkIndex);
-                  formData.append('totalChunks', totalChunks);
-                  formData.append('filename', file.name);
-                  formData.append('fileId', fileId);
-
-                  const response = await fetch('/upload-video-chunk', {
-                      method: 'POST',
-                      body: formData
-                  });
-
-                  const data = await response.json();
-
-                  if (data.status !== 'success') {
-                      throw new Error(data.message || 'Chunk upload failed');
-                  }
-
-                  // Update progress
-                  const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-                  uploadProgress.style.width = progress + '%';
-                  uploadProgressText.textContent = progress + '%';
-
-                  // Update progress tracker for upload stage
-                  updateProgressTracker('upload', progress, 0, 0);
-              }
-
-              // All chunks uploaded, start processing
-              statusBadge.textContent = 'Processing';
-              uploadProgressContainer.style.display = 'none';
-              videoProcessingStatus.style.display = 'block';
-              progressTracker.style.display = 'block';
-
-              const processResponse = await fetch('/process-chunked-video', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ fileId: fileId })
-              });
-
-              const processData = await processResponse.json();
-
-              if (processData.status !== 'success') {
-                  throw new Error(processData.message || 'Processing failed');
-              }
-
-              currentVideoJobId = processData.jobId;
-              startVideoStatusPolling();
-
-          } catch (error) {
-              console.error('Upload error:', error);
-              showError('Error uploading video: ' + error.message);
-              statusBadge.textContent = 'Error';
-              statusBadge.classList.remove('loading');
-          }
-      }
-
-      function startVideoStatusPolling() {
-          // Reset and show progress tracker
-          resetProgressTracker();
-          progressTracker.style.display = 'block';
-
-          videoStatusInterval = setInterval(async () => {
-              if (!currentVideoJobId) return;
-
-              try {
-                  const response = await fetch('/video-chunk-status/' + currentVideoJobId);
-                  const data = await response.json();
-
-                  // Update legacy progress UI
-                  statusProgressFill.style.width = data.progress + '%';
-                  statusText.textContent = data.stage;
-
-                  // Update progress tracker with new fields
-                  const currentStage = data.current_stage || 'upload';
-                  const currentFrame = data.current_frame || 0;
-                  const totalFrames = data.total_frames || 0;
-
-                  updateProgressTracker(currentStage, data.progress, currentFrame, totalFrames);
-
-                  if (data.status === 'completed') {
-                      clearInterval(videoStatusInterval);
-                      statusBadge.textContent = 'Complete';
-                      statusBadge.classList.remove('loading');
-                      statusBadge.classList.add('success');
-
-                      // Show video player
-                      const videoPlayer = document.getElementById('video-player');
-                      const videoSource = document.getElementById('video-source');
-                      const videoLoading = document.getElementById('video-loading');
-
-                      videoSource.src = '/uploads/' + data.result_filename;
-                      videoPlayer.style.display = 'block';
-                      videoLoading.style.display = 'none';
-
-                      showVideoResults();
-
-                      document.getElementById('video-status').textContent = 'Completed';
-                      document.getElementById('video-status').classList.add('success');
-
-                  } else if (data.status === 'error') {
-                      clearInterval(videoStatusInterval);
-                      showError('Error processing video: ' + data.error);
-                      statusBadge.textContent = 'Error';
-                      statusBadge.classList.remove('loading');
-                  }
-              } catch (error) {
-                  console.error('Status check error:', error);
-              }
-          }, 1000);
       }
 
       function submitForm() {
